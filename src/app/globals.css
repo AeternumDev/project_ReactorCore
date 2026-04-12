@@ -113,25 +113,63 @@ input[type="range"].vertical-slider {
   appearance: none;
   background: var(--surface);
   border: 1px solid var(--border);
-  width: 32px;
-  height: 160px;
+  width: 28px;
+  height: 120px;
   cursor: pointer;
 }
 
 input[type="range"].vertical-slider::-webkit-slider-thumb {
   appearance: none;
-  width: 32px;
-  height: 12px;
+  width: 28px;
+  height: 10px;
   background: var(--amber);
   border: none;
   cursor: pointer;
 }
 
 input[type="range"].vertical-slider::-moz-range-thumb {
-  width: 32px;
-  height: 12px;
+  width: 28px;
+  height: 10px;
   background: var(--amber);
   border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+input[type="range"].vertical-slider:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+input[type="range"].vertical-slider:disabled::-webkit-slider-thumb {
+  background: #555;
+  cursor: not-allowed;
+}
+
+/* Horizontal range sliders (turbine valve, feed water, etc.) */
+input[type="range"]:not(.vertical-slider) {
+  appearance: none;
+  height: 4px;
+  background: #333;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+input[type="range"]:not(.vertical-slider)::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--amber);
+  border: 1px solid #555;
+  cursor: pointer;
+}
+
+input[type="range"]:not(.vertical-slider)::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--amber);
+  border: 1px solid #555;
   border-radius: 0;
   cursor: pointer;
 }

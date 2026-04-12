@@ -52,7 +52,7 @@ export default function EventLog({ events, onAlarm }: EventLogProps) {
         style={{
           fontFamily: 'var(--font-share-tech-mono), monospace',
           color: 'var(--amber)',
-          fontSize: '0.85rem',
+          fontSize: '0.9rem',
           marginBottom: '8px',
           borderBottom: '1px solid var(--border)',
           paddingBottom: '6px',
@@ -67,7 +67,7 @@ export default function EventLog({ events, onAlarm }: EventLogProps) {
           flex: 1,
           overflowY: 'auto',
           fontFamily: 'var(--font-share-tech-mono), monospace',
-          fontSize: '0.72rem',
+          fontSize: '0.8rem',
           lineHeight: '1.6',
         }}
       >

@@ -61,10 +61,3 @@ src/
 └── __tests__/     # Unit-Tests
 ```
 
-## Konzeptdokument
-
-Siehe Konzeptdokument für detaillierte Informationen zur Spielmechanik, Physik-Simulation und Architektur.
-
-## Repository
-
-GitHub: *URL wird ergänzt*

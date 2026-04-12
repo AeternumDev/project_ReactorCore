@@ -6,14 +6,14 @@ exports[`EventLog renders empty state 1`] = `
     style="border: 1px solid var(--border); padding: 12px; background: var(--surface); display: flex; flex-direction: column; height: 100%;"
   >
     <div
-      style="font-family: var(--font-share-tech-mono), monospace; color: var(--amber); font-size: 0.85rem; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px;"
+      style="font-family: var(--font-share-tech-mono), monospace; color: var(--amber); font-size: 0.9rem; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px;"
     >
       EREIGNISPROTOKOLL — 
       0
        EINTRÄGE
     </div>
     <div
-      style="flex: 1 1 0%; overflow-y: auto; font-family: var(--font-share-tech-mono), monospace; font-size: 0.72rem; line-height: 1.6;"
+      style="flex: 1 1 0%; overflow-y: auto; font-family: var(--font-share-tech-mono), monospace; font-size: 0.8rem; line-height: 1.6;"
     >
       <div
         style="color: rgb(68, 68, 68);"
@@ -31,14 +31,14 @@ exports[`EventLog renders events in correct order (newest first) 1`] = `
     style="border: 1px solid var(--border); padding: 12px; background: var(--surface); display: flex; flex-direction: column; height: 100%;"
   >
     <div
-      style="font-family: var(--font-share-tech-mono), monospace; color: var(--amber); font-size: 0.85rem; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px;"
+      style="font-family: var(--font-share-tech-mono), monospace; color: var(--amber); font-size: 0.9rem; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px;"
     >
       EREIGNISPROTOKOLL — 
       4
        EINTRÄGE
     </div>
     <div
-      style="flex: 1 1 0%; overflow-y: auto; font-family: var(--font-share-tech-mono), monospace; font-size: 0.72rem; line-height: 1.6;"
+      style="flex: 1 1 0%; overflow-y: auto; font-family: var(--font-share-tech-mono), monospace; font-size: 0.8rem; line-height: 1.6;"
     >
       <div
         class="animate-pulse-alarm"

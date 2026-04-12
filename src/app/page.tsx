@@ -41,11 +41,13 @@ export default function Home() {
           {/* Fuel channel dots */}
           {Array.from({ length: 12 }).map((_, i) => {
             const angle = (i * 30 * Math.PI) / 180;
+            const cx = Math.round((300 + Math.cos(angle) * 175) * 1e6) / 1e6;
+            const cy = Math.round((300 + Math.sin(angle) * 175) * 1e6) / 1e6;
             return (
               <circle
                 key={i}
-                cx={300 + Math.cos(angle) * 175}
-                cy={300 + Math.sin(angle) * 175}
+                cx={cx}
+                cy={cy}
                 r="4"
                 fill="var(--amber)"
               />
@@ -54,15 +56,17 @@ export default function Home() {
           {/* Control rod channels */}
           {Array.from({ length: 8 }).map((_, i) => {
             const angle = ((i * 45 + 22.5) * Math.PI) / 180;
+            const rcx = Math.round((300 + Math.cos(angle) * 130) * 1e6) / 1e6;
+            const rcy = Math.round((300 + Math.sin(angle) * 130) * 1e6) / 1e6;
             return (
               <rect
                 key={`rod-${i}`}
-                x={300 + Math.cos(angle) * 130 - 3}
-                y={300 + Math.sin(angle) * 130 - 10}
+                x={rcx - 3}
+                y={rcy - 10}
                 width="6"
                 height="20"
                 fill="var(--amber)"
-                transform={`rotate(${i * 45 + 22.5}, ${300 + Math.cos(angle) * 130}, ${300 + Math.sin(angle) * 130})`}
+                transform={`rotate(${i * 45 + 22.5}, ${rcx}, ${rcy})`}
               />
             );
           })}
@@ -70,24 +74,72 @@ export default function Home() {
       </div>
 
       {/* Main content */}
-      <div className="relative z-10 text-center">
+      <div className="relative z-10 text-center" style={{ maxWidth: '640px', padding: '0 24px' }}>
         <h1
-          className="text-6xl tracking-wider mb-4"
+          className="text-5xl tracking-wider mb-2"
           style={{ fontFamily: 'var(--font-share-tech-mono), monospace', color: 'var(--amber)' }}
         >
           ☢ REAKTORCORE
         </h1>
         <p
-          className="text-sm tracking-widest mb-8 opacity-70"
+          className="text-sm tracking-widest mb-6 opacity-70"
           style={{ fontFamily: 'var(--font-share-tech-mono), monospace', color: 'var(--amber)' }}
         >
           TSCHERNOBYL-SIMULATION | 26. APRIL 1986 | 01:23 UHR
         </p>
-        <div className="mb-2 text-sm" style={{ color: '#666' }}>
-          REAKTORTYP: RBMK-1000 | LEISTUNG: 3200 MW
-        </div>
-        <div className="mb-12 text-sm" style={{ color: '#666' }}>
-          STATUS: SICHERHEITSTEST AUSSTEHEND
+
+        {/* Procedural briefing */}
+        <div
+          className="text-left mb-8"
+          style={{
+            fontFamily: 'var(--font-share-tech-mono), monospace',
+            fontSize: '0.8rem',
+            lineHeight: '1.6',
+            color: '#aaa',
+            border: '1px solid var(--border)',
+            padding: '16px 20px',
+            background: 'rgba(0,0,0,0.4)',
+          }}
+        >
+          <div style={{ color: 'var(--amber)', fontSize: '0.85rem', marginBottom: '10px', letterSpacing: '0.1em' }}>
+            EINSATZBRIEFING — SICHERHEITSTEST Nr. 4
+          </div>
+
+          <p style={{ marginBottom: '8px' }}>
+            <span style={{ color: 'var(--warning-yellow)' }}>AUSGANGSLAGE:</span>{' '}
+            Der Reaktor wurde auf 200&nbsp;MW thermisch heruntergefahren.
+            Durch das Absenken der Leistung hat sich Xenon-135 im Kern akkumuliert
+            und bremst die Kettenreaktion. OZR (Operativer Reaktivitätsvorrat)
+            liegt nahe der Mindestgrenze.
+          </p>
+
+          <p style={{ marginBottom: '8px' }}>
+            <span style={{ color: 'var(--amber)' }}>ZIEL:</span>{' '}
+            Stabilisiere die Leistung im Bereich <strong style={{ color: '#fff' }}>150–250&nbsp;MW</strong> und
+            halte sie dort, während der Turbinen-Auslauftest durchgeführt wird.
+          </p>
+
+          <div style={{ marginBottom: '8px' }}>
+            <span style={{ color: 'var(--amber)' }}>ERSTE MASSNAHMEN:</span>
+            <ol style={{ paddingLeft: '18px', marginTop: '4px' }}>
+              <li>MR-Stäbe (Handregler) vorsichtig ausfahren, um Xenon-Vergiftung auszugleichen.</li>
+              <li>USP-Kurzabsorber bei Bedarf nachjustieren.</li>
+              <li>OZR-Anzeige beobachten — <span style={{ color: 'var(--alarm-red)' }}>unter 15 Stäben OZR: kritische Grenze!</span></li>
+              <li>Leistung langsam stabilisieren, nicht sprunghaft anpassen.</li>
+            </ol>
+          </div>
+
+          <p style={{ marginBottom: '8px' }}>
+            <span style={{ color: 'var(--alarm-red)' }}>WARNUNG (OZR):</span>{' '}
+            Sinkt der OZR unter 15&nbsp;Stäbe, ist die Kontrolle über die Kettenreaktion
+            nicht mehr gewährleistet. Die Vorschrift verlangt die sofortige Abschaltung.
+          </p>
+
+          <p>
+            <span style={{ color: 'var(--safe-green)' }}>ERFOLG:</span>{' '}
+            Stabile Leistung bei 150–250&nbsp;MW über die gesamte Testdauer.
+            Xenon-Vergiftung unter Kontrolle. Kein Auslösen der Notabschaltung (AZ-5) nötig.
+          </p>
         </div>
 
         <button

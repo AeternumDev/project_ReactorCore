@@ -1,5 +1,7 @@
 'use client';
 
+import InfoTooltip from './InfoTooltip';
+
 interface EccsPanelProps {
   eccsEnabled: boolean;
   dispatch: React.Dispatch<{ type: 'TOGGLE_ECCS' }>;
@@ -18,13 +20,23 @@ export default function EccsPanel({ eccsEnabled, dispatch }: EccsPanelProps) {
         style={{
           fontFamily: 'var(--font-share-tech-mono), monospace',
           color: 'var(--amber)',
-          fontSize: '0.85rem',
+          fontSize: '0.9rem',
           marginBottom: '8px',
           borderBottom: '1px solid var(--border)',
           paddingBottom: '6px',
         }}
       >
-        NOTKÜHLSYSTEM (ECCS)
+        <span style={{ display: 'flex', alignItems: 'center' }}>NOTKÜHLSYSTEM (ECCS)
+          <InfoTooltip text={`Notkernkühlsystem (ECCS) — pumpt bei Kühlmittelverlust kaltes Wasser in den Kern.
+
+Im historischen Test wurde ECCS abgeschaltet, um eine Fehlauslösung zu verhindern.
+Abschalten ist historisch korrekt, aber entfernt eine wichtige Sicherheitsebene.
+
+Bei aktivem ECCS: Automatische Noteinspeisung bei Kühlmittelverlust.
+Bei deaktiviertem ECCS: Kein automatischer Schutz — manuelle Kontrolle erforderlich.
+
+Klicken zum Ein-/Ausschalten.`} />
+        </span>
       </div>
 
       <button
@@ -78,7 +90,7 @@ export default function EccsPanel({ eccsEnabled, dispatch }: EccsPanelProps) {
           <div
             style={{
               fontFamily: 'var(--font-share-tech-mono), monospace',
-              fontSize: '0.6rem',
+              fontSize: '0.7rem',
               color: '#666',
               marginTop: '4px',
             }}

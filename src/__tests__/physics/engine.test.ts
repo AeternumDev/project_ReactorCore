@@ -9,9 +9,10 @@ function createTestState(overrides: Partial<ReactorState> = {}): ReactorState {
 }
 
 describe("Physik-Engine", () => {
-  test("Xenon steigt bei niedriger Leistung (< 50% nominal)", () => {
+  test("Xenon steigt bei niedriger Leistung (< 700 MW Ziel)", () => {
     const state = createTestState({
-      thermalPower: 200, // ~6% of 3200 → well below 50%
+      thermalPower: 500, // unter 700 MW → Xenon-Aufbau
+      neutronFlux: 500 / PHYSICS.MAX_THERMAL_POWER,
       xenonConcentration: 0.3,
     });
     const next = calculateNextState(state);
@@ -125,8 +126,8 @@ describe("Physik-Engine", () => {
   test("elapsedSeconds >= 480 setzt testCompleted = true", () => {
     const state = createTestState({
       elapsedSeconds: PHYSICS.TEST_DURATION_SECONDS - 0.5,
-      thermalPower: 800,
-      neutronFlux: 0.25,
+      thermalPower: 700,
+      neutronFlux: 700 / PHYSICS.MAX_THERMAL_POWER,
       fuelTemperature: 650,
       steamPressure: 65,
     });
@@ -136,12 +137,36 @@ describe("Physik-Engine", () => {
     expect(newElapsed).toBeGreaterThanOrEqual(PHYSICS.TEST_DURATION_SECONDS);
     expect(next.testCompleted).toBe(true);
   });
+
+  test("Thermisches Residuum: Leistung fällt nie unter ~16 MW (thermalFloor)", () => {
+    const state = createTestState({
+      thermalPower: 20,
+      neutronFlux: 0.001,
+      xenonConcentration: 0.9,
+      controlRods: 200,
+    });
+    const next = calculateNextState(state);
+    expect(next.thermalPower!).toBeGreaterThanOrEqual(16);
+  });
+
+  test("AZ-5 post-spike: Leistung bleibt über Null (erholbar)", () => {
+    const state = createTestState({
+      thermalPower: 200,
+      neutronFlux: 0.06,
+      controlRods: 211,
+      az5Active: true,
+      az5Timer: 0, // post-spike phase
+    });
+    const next = calculateNextState(state);
+    // With 0.5 multiplier and 0.005 floor, flux should not go to zero
+    expect(next.neutronFlux!).toBeGreaterThan(0);
+  });
 });
 
 describe("Score-Berechnung", () => {
-  test("Basiswert ist 10000", () => {
+  test("Basiswert ist 10000 bei 700 MW (Zielband 700–1000)", () => {
     const state = createTestState({
-      thermalPower: 800, // within target range
+      thermalPower: 700, // within 700–1000 target range
       events: [],
       testCompleted: false,
       eccsEnabled: false,
@@ -152,7 +177,7 @@ describe("Score-Berechnung", () => {
 
   test("Abzug wenn Leistung außerhalb 700–1000 MW", () => {
     const state = createTestState({
-      thermalPower: 200, // below target
+      thermalPower: 500, // below target
       events: [],
       testCompleted: false,
     });
@@ -161,9 +186,19 @@ describe("Score-Berechnung", () => {
     expect(score).toBe(PHYSICS.BASE_SCORE - PHYSICS.SCORE_PENALTY_PER_SECOND_OFF_TARGET);
   });
 
+  test("Kein Abzug bei 1000 MW (obere Grenze)", () => {
+    const state = createTestState({
+      thermalPower: 1000,
+      events: [],
+      testCompleted: false,
+    });
+    const score = calculateScore(state);
+    expect(score).toBe(PHYSICS.BASE_SCORE);
+  });
+
   test("Bonus bei testCompleted", () => {
     const state = createTestState({
-      thermalPower: 800,
+      thermalPower: 700,
       events: [],
       testCompleted: true,
       eccsEnabled: true,
@@ -174,7 +209,7 @@ describe("Score-Berechnung", () => {
 
   test("Bonus bei !eccsEnabled && testCompleted", () => {
     const state = createTestState({
-      thermalPower: 800,
+      thermalPower: 700,
       events: [],
       testCompleted: true,
       eccsEnabled: false,
@@ -182,6 +217,44 @@ describe("Score-Berechnung", () => {
     const score = calculateScore(state);
     expect(score).toBe(
       PHYSICS.BASE_SCORE + PHYSICS.SCORE_BONUS_TEST_SUCCESS + PHYSICS.SCORE_BONUS_ECCS_DISABLED
+    );
+  });
+
+  test("Stabile-Leistung-Bonus nach 60 s im 700–1000 MW Zielband", () => {
+    const state = createTestState({
+      thermalPower: 800,
+      xenonConcentration: 0.4,
+      elapsedSeconds: 65,
+      events: [],
+      testCompleted: false,
+    });
+    const score = calculateScore(state);
+    expect(score).toBe(PHYSICS.BASE_SCORE + PHYSICS.SCORE_BONUS_STABLE_LOW_POWER);
+  });
+
+  test("Kein Stabile-Bonus bei hohem Xenon (≥ 0.7)", () => {
+    const state = createTestState({
+      thermalPower: 800,
+      xenonConcentration: 0.75,
+      elapsedSeconds: 65,
+      events: [],
+      testCompleted: false,
+    });
+    const score = calculateScore(state);
+    // No stable bonus, just base + off-target penalty (800 is in range, so just base)
+    expect(score).toBe(PHYSICS.BASE_SCORE);
+  });
+
+  test("Danger Zone Risiko-Bonus bei ~200 MW", () => {
+    const state = createTestState({
+      thermalPower: 200,
+      events: [],
+      testCompleted: false,
+    });
+    const score = calculateScore(state);
+    // Off-target penalty + danger zone bonus
+    expect(score).toBe(
+      PHYSICS.BASE_SCORE - PHYSICS.SCORE_PENALTY_PER_SECOND_OFF_TARGET + PHYSICS.SCORE_BONUS_DANGER_ZONE
     );
   });
 });
@@ -204,15 +277,15 @@ describe("Game Reducer", () => {
     const state = createTestState();
     const initialPumps = state.activeCoolantPumps;
 
-    // Toggle pump 6 (currently off) → should increase active count
-    const toggled = gameReducer(state, { type: "TOGGLE_PUMP", payload: 6 });
-    expect(toggled.activeCoolantPumps).toBe(initialPumps + 1);
-    expect(toggled.pumpStates[6]).toBe(true);
+    // Toggle pump 7 (currently on) → should decrease active count
+    const toggled = gameReducer(state, { type: "TOGGLE_PUMP", payload: 7 });
+    expect(toggled.activeCoolantPumps).toBe(initialPumps - 1);
+    expect(toggled.pumpStates[7]).toBe(false);
 
-    // Toggle same pump again → should decrease
-    const toggledBack = gameReducer(toggled, { type: "TOGGLE_PUMP", payload: 6 });
+    // Toggle same pump again → should increase
+    const toggledBack = gameReducer(toggled, { type: "TOGGLE_PUMP", payload: 7 });
     expect(toggledBack.activeCoolantPumps).toBe(initialPumps);
-    expect(toggledBack.pumpStates[6]).toBe(false);
+    expect(toggledBack.pumpStates[7]).toBe(true);
   });
 
   test("TICK wird ignoriert wenn isExploded = true", () => {

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import InfoTooltip from './InfoTooltip';
 
 interface AZ5ButtonProps {
   az5Active: boolean;
@@ -11,6 +12,15 @@ export default function AZ5Button({ az5Active, dispatch }: AZ5ButtonProps) {
   const [capOpen, setCapOpen] = useState(false);
   const [holdProgress, setHoldProgress] = useState(0);
   const holdTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const shouldDispatchRef = useRef(false);
+
+  // Dispatch AZ5 outside of setState updater to avoid "setState during render"
+  useEffect(() => {
+    if (shouldDispatchRef.current) {
+      shouldDispatchRef.current = false;
+      dispatch({ type: 'TRIGGER_AZ5' });
+    }
+  }, [holdProgress, dispatch]);
 
   const startHold = useCallback(() => {
     if (az5Active) return;
@@ -23,13 +33,13 @@ export default function AZ5Button({ az5Active, dispatch }: AZ5ButtonProps) {
         const next = prev + 10;
         if (next >= 100) {
           if (holdTimer.current) clearInterval(holdTimer.current);
-          dispatch({ type: 'TRIGGER_AZ5' });
+          shouldDispatchRef.current = true;
           return 100;
         }
         return next;
       });
     }, 100);
-  }, [az5Active, capOpen, dispatch]);
+  }, [az5Active, capOpen]);
 
   const endHold = useCallback(() => {
     if (holdTimer.current) {
@@ -54,13 +64,24 @@ export default function AZ5Button({ az5Active, dispatch }: AZ5ButtonProps) {
         style={{
           fontFamily: 'var(--font-share-tech-mono), monospace',
           color: 'var(--alarm-red)',
-          fontSize: '0.85rem',
+          fontSize: '0.9rem',
           marginBottom: '8px',
           borderBottom: '1px solid var(--border)',
           paddingBottom: '6px',
         }}
       >
-        NOTABSCHALTER
+        <span style={{ display: 'flex', alignItems: 'center' }}>AZ-5 NOTABSCHALTER
+          <InfoTooltip text={`AZ-5 — Letzter Notfallschalter. Fährt ALLE Steuerstäbe vollständig ein.
+
+Schritt 1: Schutzkappe öffnen (klicken).
+Schritt 2: Knopf gedrückt halten bis Fortschrittsbalken voll.
+
+ACHTUNG: Beim RBMK-1000 haben die Stäbe Graphitspitzen!
+Bei niedrigem OZR kann AZ-5 einen kurzen Leistungsanstieg verursachen,
+bevor die Absorption greift — der sogenannte "Tip-Effekt".
+
+Nur im absoluten Notfall verwenden!`} />
+        </span>
       </div>
 
       <div style={{ position: 'relative' }}>
@@ -84,7 +105,7 @@ export default function AZ5Button({ az5Active, dispatch }: AZ5ButtonProps) {
               style={{
                 fontFamily: 'var(--font-share-tech-mono), monospace',
                 color: 'var(--alarm-red)',
-                fontSize: '0.75rem',
+                fontSize: '0.85rem',
               }}
             >
               ▲ SCHUTZKAPPE ÖFFNEN ▲
@@ -128,7 +149,7 @@ export default function AZ5Button({ az5Active, dispatch }: AZ5ButtonProps) {
           )}
           {az5Active ? '☢ AZ-5 AKTIVIERT' : '☢ AZ-5 NOTABSCHALTER'}
           {!az5Active && capOpen && (
-            <div style={{ fontSize: '0.6rem', marginTop: '4px', color: '#888' }}>
+            <div style={{ fontSize: '0.7rem', marginTop: '4px', color: '#888' }}>
               3 SEKUNDEN HALTEN ZUM AKTIVIEREN
             </div>
           )}

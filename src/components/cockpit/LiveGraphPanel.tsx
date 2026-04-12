@@ -34,7 +34,7 @@ const graphContainerStyle = {
 
 const labelStyle = {
   fontFamily: 'var(--font-share-tech-mono), monospace',
-  fontSize: '0.65rem',
+  fontSize: '0.75rem',
   color: 'var(--amber)',
   padding: '2px 8px',
   borderBottom: '1px solid var(--border)',
@@ -62,7 +62,7 @@ export default function LiveGraphPanel({ neutronFlux, coreTemperature, steamPres
 
   const tickStyle = {
     fontFamily: 'Share Tech Mono, monospace',
-    fontSize: 10,
+    fontSize: 12,
     fill: '#666',
   };
 
@@ -81,7 +81,7 @@ export default function LiveGraphPanel({ neutronFlux, coreTemperature, steamPres
         style={{
           fontFamily: 'var(--font-share-tech-mono), monospace',
           color: 'var(--amber)',
-          fontSize: '0.85rem',
+          fontSize: '0.9rem',
           marginBottom: '4px',
           borderBottom: '1px solid var(--border)',
           paddingBottom: '6px',

@@ -1,5 +1,7 @@
 'use client';
 
+import InfoTooltip from './InfoTooltip';
+
 interface CoolantPumpPanelProps {
   pumpStates: [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean];
   dispatch: React.Dispatch<{ type: 'TOGGLE_PUMP'; payload: number }>;
@@ -10,7 +12,7 @@ export default function CoolantPumpPanel({ pumpStates, dispatch }: CoolantPumpPa
     <div
       style={{
         border: '1px solid var(--border)',
-        padding: '12px',
+        padding: '8px',
         background: 'var(--surface)',
       }}
     >
@@ -19,19 +21,29 @@ export default function CoolantPumpPanel({ pumpStates, dispatch }: CoolantPumpPa
           fontFamily: 'var(--font-share-tech-mono), monospace',
           color: 'var(--amber)',
           fontSize: '0.85rem',
-          marginBottom: '8px',
+          marginBottom: '6px',
           borderBottom: '1px solid var(--border)',
-          paddingBottom: '6px',
+          paddingBottom: '4px',
         }}
       >
-        KÜHLMITTELPUMPEN — {pumpStates.filter(Boolean).length}/8 AKTIV
+        <span style={{ display: 'flex', alignItems: 'center' }}>KÜHLMITTELPUMPEN — {pumpStates.filter(Boolean).length}/8 AKTIV
+          <InfoTooltip text={`Hauptumwälzpumpen (MCP) treiben das Kühlmittel durch den Reaktorkern.
+
+8 Pumpen verfügbar — je mehr aktiv, desto höher der Kühlmittelfluss.
+Höherer Fluss = bessere Kühlung, aber auch weniger Dampfblasen.
+
+Für den Turbinen-Auslauftest müssen Pumpen strategisch abgeschaltet werden.
+Achtung: Zu wenig Kühlung bei hoher Leistung führt zu Überhitzung!
+
+Klicken Sie auf eine Pumpe, um sie ein-/auszuschalten.`} />
+        </span>
       </div>
 
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '8px',
+          gap: '6px',
         }}
       >
         {pumpStates.map((isActive, i) => (
@@ -62,7 +74,7 @@ export default function CoolantPumpPanel({ pumpStates, dispatch }: CoolantPumpPa
             <span
               style={{
                 fontFamily: 'var(--font-share-tech-mono), monospace',
-                fontSize: '0.7rem',
+                fontSize: '0.8rem',
                 color: 'var(--amber)',
               }}
             >
@@ -71,7 +83,7 @@ export default function CoolantPumpPanel({ pumpStates, dispatch }: CoolantPumpPa
             <span
               style={{
                 fontFamily: 'var(--font-share-tech-mono), monospace',
-                fontSize: '0.6rem',
+                fontSize: '0.7rem',
                 color: isActive ? 'var(--safe-green)' : 'var(--alarm-red)',
               }}
             >

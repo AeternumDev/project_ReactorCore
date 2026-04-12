@@ -14,26 +14,39 @@ beforeAll(() => {
 });
 
 describe('StatusDisplayPanel', () => {
+  const baseProps = {
+    thermalPower: 200,
+    xenonConcentration: 0.3,
+    steamPressure: 65,
+    elapsedSeconds: 120,
+    coolantTemperature: 270,
+    fuelTemperature: 650,
+    coolantFlowRate: 45000,
+    steamVoidFraction: 0.1,
+    neutronFlux: 0.06,
+    generatorOutput: 180,
+    reactivityMargin: 26,
+    controlRods: 50,
+    manualRods: 26,
+  };
+
   it('renders correct MW display', () => {
     const { container } = render(
-      <StatusDisplayPanel
-        thermalPower={850}
-        xenonConcentration={0.3}
-        steamPressure={65}
-        elapsedSeconds={120}
-      />
+      <StatusDisplayPanel {...baseProps} />
     );
     expect(container).toMatchSnapshot();
   });
 
-  it('shows red color for power above 1000 MW', () => {
+  it('shows warning color for power above 250 MW', () => {
     const { container } = render(
-      <StatusDisplayPanel
-        thermalPower={1500}
-        xenonConcentration={0.3}
-        steamPressure={65}
-        elapsedSeconds={120}
-      />
+      <StatusDisplayPanel {...baseProps} thermalPower={400} />
+    );
+    expect(container).toMatchSnapshot();
+  });
+
+  it('shows green for power within 150-250 MW band', () => {
+    const { container } = render(
+      <StatusDisplayPanel {...baseProps} thermalPower={200} />
     );
     expect(container).toMatchSnapshot();
   });
