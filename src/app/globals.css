@@ -1,26 +1,156 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --amber: #FF8C00;
+  --alarm-red: #FF2020;
+  --safe-green: #00FF41;
+  --warning-yellow: #FFD700;
+  --bg: #080808;
+  --surface: #111111;
+  --border: #2a2a2a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--bg);
+  --color-foreground: var(--amber);
+  --color-amber: var(--amber);
+  --color-alarm-red: var(--alarm-red);
+  --color-safe-green: var(--safe-green);
+  --color-warning-yellow: var(--warning-yellow);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* Scanline texture overlay */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--amber);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+}
+
+/* Pulsing alarm animation */
+@keyframes pulse-alarm {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes border-flash {
+  0%, 100% { box-shadow: 0 0 0px var(--alarm-red); }
+  50% { box-shadow: 0 0 30px var(--alarm-red); }
+}
+
+.animate-pulse-alarm {
+  animation: pulse-alarm 1s ease-in-out infinite;
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+.animate-border-flash {
+  animation: border-flash 0.5s ease-in-out infinite;
+}
+
+/* Industrial glow borders */
+.glow-amber {
+  box-shadow: 0 0 8px var(--amber);
+}
+
+.glow-red {
+  box-shadow: 0 0 8px var(--alarm-red);
+}
+
+.glow-green {
+  box-shadow: 0 0 8px var(--safe-green);
+}
+
+/* Control room button base */
+.btn-industrial {
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  background: transparent;
+  padding: 12px 32px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-industrial:hover {
+  background: var(--amber);
+  color: #000;
+}
+
+/* Vertical range slider */
+input[type="range"].vertical-slider {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  width: 32px;
+  height: 160px;
+  cursor: pointer;
+}
+
+input[type="range"].vertical-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 32px;
+  height: 12px;
+  background: var(--amber);
+  border: none;
+  cursor: pointer;
+}
+
+input[type="range"].vertical-slider::-moz-range-thumb {
+  width: 32px;
+  height: 12px;
+  background: var(--amber);
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+
+/* 7-segment display style */
+.seven-segment {
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px currentColor;
 }

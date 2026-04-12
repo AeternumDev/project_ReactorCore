@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ReactorCore — Tschernobyl-Reaktor-Simulation
 
-## Getting Started
+Eine browserbasierte Tschernobyl-Reaktor-Simulation als Single Page Application. Steuere einen RBMK-1000-Reaktor und erlebe die Physik hinter dem Unfall von 1986.
 
-First, run the development server:
+## Tech-Stack
+
+| Technologie | Verwendung |
+|---|---|
+| Next.js 14 | Framework (App Router) |
+| React | UI-Bibliothek |
+| TypeScript | Typsicherheit |
+| Tailwind CSS | Styling |
+| Clerk | Authentifizierung |
+| PostgreSQL | Datenbank (Railway) |
+| Recharts | Diagramme & Visualisierung |
+| Lucide React | Icons |
+| Jest + Testing Library | Unit-Tests |
+
+## Setup
 
 ```bash
+# Repository klonen
+git clone <REPO_URL>
+cd project_ReactorCore
+
+# Dependencies installieren
+npm install
+
+# Umgebungsvariablen konfigurieren
+cp .env.example .env.local
+# .env.local mit echten Werten befüllen (Clerk Keys, DATABASE_URL)
+
+# Entwicklungsserver starten
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Die App ist dann unter [http://localhost:3000](http://localhost:3000) erreichbar.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Befehl | Beschreibung |
+|---|---|
+| `npm run dev` | Entwicklungsserver starten |
+| `npm run build` | Produktions-Build |
+| `npm run start` | Produktionsserver starten |
+| `npm run lint` | ESLint ausführen |
+| `npm test` | Tests ausführen |
+| `npm run test:watch` | Tests im Watch-Modus |
+| `npm run test:coverage` | Tests mit Coverage-Report |
 
-## Learn More
+## Projektstruktur
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/           # Next.js App Router (Pages, Layouts, API Routes)
+├── components/    # React-Komponenten (Cockpit, UI)
+├── lib/
+│   ├── physics/   # Reaktor-Physik-Engine
+│   ├── game/      # Game-State (Reducer, Actions, Scoring)
+│   └── db.ts      # Datenbank-Verbindung
+└── __tests__/     # Unit-Tests
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Konzeptdokument
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Siehe Konzeptdokument für detaillierte Informationen zur Spielmechanik, Physik-Simulation und Architektur.
 
-## Deploy on Vercel
+## Repository
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+GitHub: *URL wird ergänzt*

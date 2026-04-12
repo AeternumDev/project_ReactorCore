@@ -1,0 +1,82 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`EventLog renders empty state 1`] = `
+<div>
+  <div
+    style="border: 1px solid var(--border); padding: 12px; background: var(--surface); display: flex; flex-direction: column; height: 100%;"
+  >
+    <div
+      style="font-family: var(--font-share-tech-mono), monospace; color: var(--amber); font-size: 0.85rem; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px;"
+    >
+      EREIGNISPROTOKOLL — 
+      0
+       EINTRÄGE
+    </div>
+    <div
+      style="flex: 1 1 0%; overflow-y: auto; font-family: var(--font-share-tech-mono), monospace; font-size: 0.72rem; line-height: 1.6;"
+    >
+      <div
+        style="color: rgb(68, 68, 68);"
+      >
+        Keine Ereignisse.
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`EventLog renders events in correct order (newest first) 1`] = `
+<div>
+  <div
+    style="border: 1px solid var(--border); padding: 12px; background: var(--surface); display: flex; flex-direction: column; height: 100%;"
+  >
+    <div
+      style="font-family: var(--font-share-tech-mono), monospace; color: var(--amber); font-size: 0.85rem; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px;"
+    >
+      EREIGNISPROTOKOLL — 
+      4
+       EINTRÄGE
+    </div>
+    <div
+      style="flex: 1 1 0%; overflow-y: auto; font-family: var(--font-share-tech-mono), monospace; font-size: 0.72rem; line-height: 1.6;"
+    >
+      <div
+        class="animate-pulse-alarm"
+        style="color: var(--alarm-red); font-weight: bold;"
+      >
+        [
+        01:30
+        ] 
+        KERNSCHMELZE — REAKTOR 4 EXPLODIERT
+      </div>
+      <div
+        class=""
+        style="color: var(--alarm-red);"
+      >
+        [
+        01:00
+        ] 
+        BRENNSTOFFTEMPERATUR KRITISCH
+      </div>
+      <div
+        class=""
+        style="color: var(--warning-yellow);"
+      >
+        [
+        00:30
+        ] 
+        XENON-VERGIFTUNG ERHÖHT
+      </div>
+      <div
+        class=""
+        style="color: rgb(102, 102, 102);"
+      >
+        [
+        00:10
+        ] 
+        REAKTOR GESTARTET
+      </div>
+    </div>
+  </div>
+</div>
+`;

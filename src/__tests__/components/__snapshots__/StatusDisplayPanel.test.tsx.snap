@@ -1,0 +1,157 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`StatusDisplayPanel renders correct MW display 1`] = `
+<div>
+  <div
+    style="border: 1px solid var(--border); padding: 12px; background: var(--surface);"
+  >
+    <div
+      style="font-family: var(--font-share-tech-mono), monospace; color: var(--amber); font-size: 0.85rem; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px;"
+    >
+      STATUSANZEIGEN
+    </div>
+    <div
+      style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;"
+    >
+      <div
+        style="border: 1px solid var(--amber); background: var(--bg); padding: 8px 12px;"
+      >
+        <div
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 0.6rem; color: rgb(102, 102, 102); margin-bottom: 4px; text-transform: uppercase;"
+        >
+          REAKTORLEISTUNG
+        </div>
+        <div
+          class="seven-segment "
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 2.2rem; color: var(--safe-green); line-height: 1;"
+        >
+          850 MW
+        </div>
+      </div>
+      <div
+        style="border: 1px solid var(--amber); background: var(--bg); padding: 8px 12px;"
+      >
+        <div
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 0.6rem; color: rgb(102, 102, 102); margin-bottom: 4px; text-transform: uppercase;"
+        >
+          XENON-VERGIFTUNG
+        </div>
+        <div
+          class="seven-segment "
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 2.2rem; color: var(--amber); line-height: 1;"
+        >
+          30.0%
+        </div>
+      </div>
+      <div
+        style="border: 1px solid var(--amber); background: var(--bg); padding: 8px 12px;"
+      >
+        <div
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 0.6rem; color: rgb(102, 102, 102); margin-bottom: 4px; text-transform: uppercase;"
+        >
+          DAMPFDRUCK
+        </div>
+        <div
+          class="seven-segment "
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 2.2rem; color: var(--amber); line-height: 1;"
+        >
+          65.0 bar
+        </div>
+      </div>
+      <div
+        style="border: 1px solid var(--amber); background: var(--bg); padding: 8px 12px;"
+      >
+        <div
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 0.6rem; color: rgb(102, 102, 102); margin-bottom: 4px; text-transform: uppercase;"
+        >
+          ÜBERLEBENSZEIT
+        </div>
+        <div
+          class="seven-segment "
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 2.2rem; color: var(--safe-green); line-height: 1;"
+        >
+          02:00
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`StatusDisplayPanel shows red color for power above 1000 MW 1`] = `
+<div>
+  <div
+    style="border: 1px solid var(--border); padding: 12px; background: var(--surface);"
+  >
+    <div
+      style="font-family: var(--font-share-tech-mono), monospace; color: var(--amber); font-size: 0.85rem; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px;"
+    >
+      STATUSANZEIGEN
+    </div>
+    <div
+      style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;"
+    >
+      <div
+        style="border: 1px solid var(--amber); background: var(--bg); padding: 8px 12px;"
+      >
+        <div
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 0.6rem; color: rgb(102, 102, 102); margin-bottom: 4px; text-transform: uppercase;"
+        >
+          REAKTORLEISTUNG
+        </div>
+        <div
+          class="seven-segment "
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 2.2rem; color: var(--alarm-red); line-height: 1;"
+        >
+          1500 MW
+        </div>
+      </div>
+      <div
+        style="border: 1px solid var(--amber); background: var(--bg); padding: 8px 12px;"
+      >
+        <div
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 0.6rem; color: rgb(102, 102, 102); margin-bottom: 4px; text-transform: uppercase;"
+        >
+          XENON-VERGIFTUNG
+        </div>
+        <div
+          class="seven-segment "
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 2.2rem; color: var(--amber); line-height: 1;"
+        >
+          30.0%
+        </div>
+      </div>
+      <div
+        style="border: 1px solid var(--amber); background: var(--bg); padding: 8px 12px;"
+      >
+        <div
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 0.6rem; color: rgb(102, 102, 102); margin-bottom: 4px; text-transform: uppercase;"
+        >
+          DAMPFDRUCK
+        </div>
+        <div
+          class="seven-segment "
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 2.2rem; color: var(--amber); line-height: 1;"
+        >
+          65.0 bar
+        </div>
+      </div>
+      <div
+        style="border: 1px solid var(--amber); background: var(--bg); padding: 8px 12px;"
+      >
+        <div
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 0.6rem; color: rgb(102, 102, 102); margin-bottom: 4px; text-transform: uppercase;"
+        >
+          ÜBERLEBENSZEIT
+        </div>
+        <div
+          class="seven-segment "
+          style="font-family: var(--font-share-tech-mono), monospace; font-size: 2.2rem; color: var(--safe-green); line-height: 1;"
+        >
+          02:00
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
