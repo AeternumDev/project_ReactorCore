@@ -2,8 +2,13 @@
 import { PHYSICS } from '@/lib/physics/constants';
 
 export type RodType = 'AZ' | 'AR' | 'RR' | 'LAR' | 'USP';
-export type ChannelType = 'fuel' | 'rod' | 'absorber' | 'empty';
+export type ChannelType = 'fuel' | 'rod' | 'sensor' | 'absorber' | 'empty';
 export type Quadrant = 'NW' | 'NE' | 'SW' | 'SE';
+
+interface Position {
+  row: number;
+  col: number;
+}
 
 export interface RodInfo {
   row: number;
@@ -21,18 +26,192 @@ export interface ChannelInfo {
   rodType?: RodType;
   id: string;
   quadrant: Quadrant;
+  layoutColor?: string;
 }
 
-// Core grid config — RBMK-1000: ~1661 fuel + 211 CPS channels on 25cm lattice
-export const CORE_GRID = 50;
+// Core grid config — image-derived RBMK-1000 lattice
+// 1661 fuel channels + 211 control rods + 12 in-core detector channels.
+export const CORE_GRID = 48;
 const CENTER = CORE_GRID / 2;
-const RADIUS = 23;
+const RADIUS = 23.5;
 export const CORE_RADIUS = RADIUS;
 
+const CORE_ROW_SPANS: Array<[number, number]> = [
+  [17, 30],
+  [14, 33],
+  [12, 35],
+  [10, 37],
+  [9, 38],
+  [8, 39],
+  [7, 40],
+  [6, 41],
+  [5, 42],
+  [4, 43],
+  [3, 44],
+  [3, 44],
+  [2, 45],
+  [2, 45],
+  [1, 46],
+  [1, 46],
+  [1, 46],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [0, 47],
+  [1, 46],
+  [1, 46],
+  [1, 46],
+  [2, 45],
+  [2, 45],
+  [3, 44],
+  [3, 44],
+  [4, 43],
+  [5, 42],
+  [6, 41],
+  [7, 40],
+  [8, 39],
+  [9, 38],
+  [10, 37],
+  [12, 35],
+  [14, 33],
+  [17, 30],
+];
+
+const REFERENCE_LAYOUT_COLORS = {
+  cyan: '#00b150',
+  yellow: '#fed800',
+  red: '#de1700',
+  blue: '#0067ce',
+} as const;
+
+const SENSOR_ROW_MAP: Record<number, number[]> = {
+  7: [15, 31],
+  15: [7, 23, 39],
+  23: [15, 31],
+  31: [7, 23, 39],
+  39: [15, 31],
+};
+
+const RED_ROW_MAP: Record<number, number[]> = {
+  11: [23],
+  15: [15, 31],
+  19: [23],
+  23: [11, 19, 27, 35],
+  27: [23],
+  31: [15, 31],
+  35: [23],
+};
+
+const YELLOW_ROW_MAP: Record<number, number[]> = {
+  3: [11, 19, 27, 35],
+  11: [3, 11, 19, 27, 35, 43],
+  19: [3, 11, 19, 27, 35, 43],
+  27: [3, 11, 19, 27, 35, 43],
+  35: [3, 11, 19, 27, 35, 43],
+  43: [11, 19, 27, 35],
+};
+
+const CYAN_ROW_MAP: Record<number, number[]> = {
+  1: [17, 21, 25, 29],
+  3: [15, 23, 31],
+  5: [9, 13, 17, 21, 25, 29, 33, 37],
+  7: [7, 11, 19, 23, 27, 35, 39],
+  9: [5, 9, 13, 17, 21, 25, 29, 33, 37, 41],
+  11: [7, 15, 31, 39],
+  13: [5, 9, 13, 17, 21, 25, 29, 33, 37, 41],
+  15: [3, 11, 19, 27, 35, 43],
+  17: [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45],
+  19: [7, 15, 31, 39],
+  21: [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45],
+  23: [3, 7, 23, 39, 43],
+  25: [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45],
+  27: [7, 15, 31, 39],
+  29: [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45],
+  31: [3, 11, 19, 27, 35, 43],
+  33: [5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45],
+  35: [7, 15, 31, 39],
+  37: [5, 9, 13, 17, 21, 25, 29, 33, 37, 41],
+  39: [7, 11, 19, 23, 27, 35, 39],
+  41: [9, 13, 17, 21, 25, 29, 33, 37],
+  43: [15, 23, 31],
+  45: [17, 21, 25, 29, 33],
+};
+
+const AZ_ROW_MAP: Record<number, number[]> = {
+  1: [21, 29],
+  5: [13, 37],
+  9: [5, 25],
+  11: [31, 39],
+  13: [17],
+  17: [33, 45],
+  19: [7],
+  23: [23],
+  25: [41],
+  29: [1, 13, 33],
+  33: [21, 45],
+  37: [5, 37],
+  41: [13],
+  43: [31],
+  45: [21],
+};
+
+function expandRowMap(rowMap: Record<number, number[]>): Position[] {
+  const positions: Position[] = [];
+
+  Object.entries(rowMap).forEach(([rowText, cols]) => {
+    const row = Number(rowText);
+    cols.forEach(col => positions.push({ row, col }));
+  });
+
+  return positions;
+}
+
+function comparePositions(a: Position, b: Position): number {
+  return a.row - b.row || a.col - b.col;
+}
+
+function toPositionKey(row: number, col: number): string {
+  return `${row}:${col}`;
+}
+
+const SENSOR_POSITIONS = expandRowMap(SENSOR_ROW_MAP);
+const RED_LAYOUT_POSITIONS = expandRowMap(RED_ROW_MAP);
+const YELLOW_LAYOUT_POSITIONS = expandRowMap(YELLOW_ROW_MAP);
+const CYAN_LAYOUT_POSITIONS = expandRowMap(CYAN_ROW_MAP);
+const AZ_POSITIONS = expandRowMap(AZ_ROW_MAP);
+
+const SENSOR_POSITION_SET = new Set(SENSOR_POSITIONS.map(({ row, col }) => toPositionKey(row, col)));
+const RED_LAYOUT_SET = new Set(RED_LAYOUT_POSITIONS.map(({ row, col }) => toPositionKey(row, col)));
+const YELLOW_LAYOUT_SET = new Set(YELLOW_LAYOUT_POSITIONS.map(({ row, col }) => toPositionKey(row, col)));
+const CYAN_LAYOUT_SET = new Set(CYAN_LAYOUT_POSITIONS.map(({ row, col }) => toPositionKey(row, col)));
+const AZ_POSITION_SET = new Set(AZ_POSITIONS.map(({ row, col }) => toPositionKey(row, col)));
+
+function getLayoutColor(row: number, col: number): string | undefined {
+  const key = toPositionKey(row, col);
+
+  if (SENSOR_POSITION_SET.has(key)) return REFERENCE_LAYOUT_COLORS.blue;
+  if (RED_LAYOUT_SET.has(key)) return REFERENCE_LAYOUT_COLORS.red;
+  if (YELLOW_LAYOUT_SET.has(key)) return REFERENCE_LAYOUT_COLORS.yellow;
+  if (CYAN_LAYOUT_SET.has(key)) return REFERENCE_LAYOUT_COLORS.cyan;
+
+  return undefined;
+}
+
 export function isInsideCore(row: number, col: number): boolean {
-  const dx = col - CENTER + 0.5;
-  const dy = row - CENTER + 0.5;
-  return Math.sqrt(dx * dx + dy * dy) <= RADIUS;
+  if (row < 0 || row >= CORE_ROW_SPANS.length) return false;
+
+  const [startCol, endCol] = CORE_ROW_SPANS[row];
+  return col >= startCol && col <= endCol;
 }
 
 export function getQuadrant(row: number, col: number): Quadrant {
@@ -194,123 +373,35 @@ export function getCoreWarnings(
   return warnings;
 }
 
-// Generate 211 CPS rods on a regular sublattice — RBMK-1000 CPS pattern
-//
-// Historical layout principle:
-//   All CPS channels sit on a regular sublattice (every 3rd position).
-//   AZ  (24)  — dedicated positions on a sparser 6×6 sub-grid, evenly distributed
-//   AR  (12)  — innermost ring, central automatic power regulators
-//   USP (32)  — interleaved among RR in inner/mid zone (every 2nd–3rd rod position)
-//   LAR (12)  — interleaved among RR in mid zone (every 4th–5th rod position)
-//   RR  (131) — remaining positions (manual control rods)
-//
-// The interleaving creates the pattern the user expects:
-//   Inner: RR, USP, RR, LAR, RR, USP, ...
-//   Outer: RR, RR, RR, USP, RR, RR, LAR, ...
 export function generateRods(): RodInfo[] {
   const rods: RodInfo[] = [];
-
-  // Phase 1: Collect all CPS sublattice positions (every 3rd cell)
-  const cpsPositions: Array<{ row: number; col: number; r: number }> = [];
-  for (let row = 0; row < CORE_GRID; row++) {
-    for (let col = 0; col < CORE_GRID; col++) {
-      if (!isInsideCore(row, col)) continue;
-      // Regular 3×3 sublattice with offset rows for better coverage
-      const onGrid = (row % 3 === 1 && col % 3 === 1) ||
-                     (row % 6 === 4 && col % 6 === 4);
-      if (onGrid) {
-        const dx = col - CENTER + 0.5;
-        const dy = row - CENTER + 0.5;
-        cpsPositions.push({ row, col, r: Math.sqrt(dx * dx + dy * dy) });
-      }
-    }
-  }
-
-  // Sort by radius for zone-based assignment
-  cpsPositions.sort((a, b) => a.r - b.r);
-  const selected = cpsPositions.slice(0, Math.min(211, cpsPositions.length));
-
-  // Phase 2: Mark AZ positions first — on a sparser sub-grid for even distribution
-  // AZ rods sit every ~9th CPS position, spread from inner to outer
-  const azStride = Math.max(1, Math.floor(selected.length / 24));
-  const azSet = new Set<number>();
-  // Start from offset 2 so AZ don't overlap with AR in center
-  for (let i = 0; i < 24; i++) {
-    const idx = Math.min(2 + i * azStride, selected.length - 1);
-    if (!azSet.has(idx)) azSet.add(idx);
-  }
-
-  // Phase 3: From non-AZ positions, assign AR/USP/LAR/RR with interleaving
-  const nonAzIndices: number[] = [];
-  for (let i = 0; i < selected.length; i++) {
-    if (!azSet.has(i)) nonAzIndices.push(i);
-  }
-
-  // AR: 12 innermost non-AZ positions
-  const arCount = 12;
-
-  // For remaining positions after AR: interleave USP and LAR among RR
-  // based on radial zone
-  const maxR = selected.length > 0 ? selected[selected.length - 1].r : 1;
-  const counts: Record<RodType, number> = { AZ: 0, AR: 0, RR: 0, LAR: 0, USP: 0 };
-  const assignments = new Map<number, RodType>();
-
-  // Assign AZ
-  azSet.forEach(idx => { assignments.set(idx, 'AZ'); counts.AZ++; });
-
-  // Assign non-AZ
-  let uspPlaced = 0, larPlaced = 0;
-  let interleaveCounter = 0;
-
-  nonAzIndices.forEach((idx, seqIdx) => {
-    if (seqIdx < arCount) {
-      // AR: innermost 12
-      assignments.set(idx, 'AR');
-      counts.AR++;
-      return;
-    }
-
-    const pos = selected[idx];
-    const rNorm = pos.r / maxR; // 0 = center, 1 = edge
-
-    // Interleaving density depends on zone:
-    //   Inner (r < 0.4): every 2nd position is USP or LAR → pattern: RR, USP, RR, LAR, ...
-    //   Mid   (r < 0.7): every 3rd position → RR, RR, USP, RR, RR, LAR, ...
-    //   Outer (r >= 0.7): every 4th position → RR, RR, RR, USP/LAR, ...
-    const interleaveInterval = rNorm < 0.4 ? 2 : rNorm < 0.7 ? 3 : 4;
-
-    interleaveCounter++;
-    if (interleaveCounter % interleaveInterval === 0) {
-      // Alternate between USP and LAR, respecting quotas
-      if (uspPlaced < 32 && (larPlaced >= 12 || interleaveCounter % (interleaveInterval * 2) !== 0)) {
-        assignments.set(idx, 'USP');
-        counts.USP++;
-        uspPlaced++;
-      } else if (larPlaced < 12) {
-        assignments.set(idx, 'LAR');
-        counts.LAR++;
-        larPlaced++;
-      } else if (uspPlaced < 32) {
-        assignments.set(idx, 'USP');
-        counts.USP++;
-        uspPlaced++;
-      } else {
-        assignments.set(idx, 'RR');
-        counts.RR++;
-      }
-    } else {
-      assignments.set(idx, 'RR');
-      counts.RR++;
-    }
-  });
-
-  // Phase 4: Build rod array
   const groupCounters: Record<RodType, number> = { AZ: 0, AR: 0, RR: 0, LAR: 0, USP: 0 };
-  selected.forEach((pos, idx) => {
-    const type = assignments.get(idx) ?? 'RR';
+
+  const rodPositions = [
+    ...CYAN_LAYOUT_POSITIONS,
+    ...RED_LAYOUT_POSITIONS,
+    ...YELLOW_LAYOUT_POSITIONS,
+  ].sort(comparePositions);
+
+  rodPositions.forEach(pos => {
+    const key = toPositionKey(pos.row, pos.col);
+    let type: RodType;
+
+    if (RED_LAYOUT_SET.has(key)) {
+      type = 'AR';
+    } else if (YELLOW_LAYOUT_SET.has(key)) {
+      type = 'USP';
+    } else if (AZ_POSITION_SET.has(key)) {
+      type = 'AZ';
+    } else {
+      type = 'RR';
+    }
+
     groupCounters[type]++;
     rods.push({
-      row: pos.row, col: pos.col, type,
+      row: pos.row,
+      col: pos.col,
+      type,
       id: `${String(pos.col + 1).padStart(2, '0')}-${String(pos.row + 1).padStart(2, '0')}`,
       quadrant: getQuadrant(pos.row, pos.col),
       group: groupCounters[type] - 1,
@@ -320,23 +411,32 @@ export function generateRods(): RodInfo[] {
   return rods;
 }
 
-// Generate all channels for the mnemonic board (~1660 channels in RBMK-1000 layout)
+// Generate all channels for the mnemonic board.
 export function generateChannels(): ChannelInfo[] {
   const channels: ChannelInfo[] = [];
   const rods = generateRods();
   const rodMap = new Map<string, RodInfo>();
-  rods.forEach(r => rodMap.set(`${r.row}-${r.col}`, r));
+  rods.forEach(r => rodMap.set(toPositionKey(r.row, r.col), r));
 
   for (let row = 0; row < CORE_GRID; row++) {
-    for (let col = 0; col < CORE_GRID; col++) {
-      if (!isInsideCore(row, col)) continue;
+    const [startCol, endCol] = CORE_ROW_SPANS[row];
 
-      const key = `${row}-${col}`;
+    for (let col = startCol; col <= endCol; col++) {
+      const key = toPositionKey(row, col);
       const rod = rodMap.get(key);
       const id = `${String(col + 1).padStart(2, '0')}-${String(row + 1).padStart(2, '0')}`;
       const quadrant = getQuadrant(row, col);
 
-      if (rod) {
+      if (SENSOR_POSITION_SET.has(key)) {
+        channels.push({
+          row,
+          col,
+          channelType: 'sensor',
+          id,
+          quadrant,
+          layoutColor: REFERENCE_LAYOUT_COLORS.blue,
+        });
+      } else if (rod) {
         channels.push({
           row,
           col,
@@ -344,6 +444,7 @@ export function generateChannels(): ChannelInfo[] {
           rodType: rod.type,
           id,
           quadrant,
+          layoutColor: getLayoutColor(row, col),
         });
       } else {
         channels.push({

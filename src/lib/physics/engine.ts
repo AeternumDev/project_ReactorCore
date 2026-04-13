@@ -36,7 +36,10 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
   const xenonPenalty = state.xenonConcentration * PHYSICS.XENON_MAX_REACTIVITY_PENALTY;
 
   // Positiver Dampfblasenkoeffizient: Dampfblasen ERHÖHEN Reaktivität (RBMK-Fehler)
-  const voidBoost = state.steamVoidFraction * PHYSICS.VOID_COEFFICIENT * 100;
+  // Verstärkung bei niedriger Leistung (< 700 MWth) — historischer RBMK-Designfehler
+  const lowPowerFactor = Math.max(1, PHYSICS.LOW_POWER_VOID_AMPLIFICATION -
+    (PHYSICS.LOW_POWER_VOID_AMPLIFICATION - 1) * (state.thermalPower / PHYSICS.TEST_POWER_TARGET));
+  const voidBoost = state.steamVoidFraction * PHYSICS.VOID_COEFFICIENT * 100 * lowPowerFactor;
 
   // Niedrigleistungs-Mindestfluss: Thermische Trägheit verhindert sofortiges Absinken auf 0
   const thermalFloor = 0.005; // ~16 MW Restwärme
@@ -54,26 +57,29 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
   let az5PrePower = state.az5PrePower;
 
   if (az5Active && az5Timer > 0) {
-    // Wenn ORM < 15: Reaktor ist "un-trippable" — Spike ist katastrophal
-    const spikeMultiplier = state.reactivityMargin < PHYSICS.OZR_MINIMUM_SAFE
-      ? PHYSICS.AZ5_LOW_ORM_MULTIPLIER    // 5.0x — Bremsen versagen
-      : PHYSICS.AZ5_GRAPHIT_POWER_MULTIPLIER; // 2.5x — normaler Spike
-    neutronFlux = neutronFlux * spikeMultiplier;
+    const spikeFactor = calculateAz5GraphiteSpikeFactor(state, az5Timer);
+    if (spikeFactor > 1) {
+      neutronFlux = neutronFlux * spikeFactor;
+    }
+
+    // Nach Graphit-Phase: Absorberstaebe beginnen zu wirken (ueber controlRods)
     az5Timer -= DT;
     if (az5Timer <= 0) {
       az5Active = false;
       az5Timer = 0;
     }
   } else if (az5Active && az5Timer <= 0) {
-    // Nach Spike: starke Dämpfung, aber Erholung durch Stabmanagement möglich
+    // Vollstaendig eingefahren: starke Daempfung
     neutronFlux = neutronFlux * 0.5;
     if (neutronFlux < 0.005) {
-      neutronFlux = 0.005; // Restwärme-Boden — Reaktor sinkt nicht auf exakt 0
+      neutronFlux = 0.005; // Restwaerme-Boden
       az5Active = false;
     }
   }
 
-  neutronFlux = Math.max(0, Math.min(1, neutronFlux));
+  // Flux-Obergrenze erlaubt Leistungsexkursion bis 33.000 MWth (Referenz: >33.000 MWth)
+  const fluxCap = PHYSICS.PEAK_EXCURSION_POWER / PHYSICS.MAX_THERMAL_POWER;
+  neutronFlux = Math.max(0, Math.min(fluxCap, neutronFlux));
 
   // --- 3b. Thermische Leistung ---
   const powerInertia = 0.15;
@@ -113,7 +119,18 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
 
   // --- 3d. Kühlmittel und Temperaturen ---
   const coolantFlowRate = state.activeCoolantPumps * PHYSICS.COOLANT_FLOW_PER_PUMP;
-  const coolingCapacity = coolantFlowRate / PHYSICS.COOLANT_FLOW_NOMINAL; // 0..~1.14
+  let coolingCapacity = coolantFlowRate / PHYSICS.COOLANT_FLOW_NOMINAL; // 0..~1.14
+
+  // Kavitation: bei minimaler Unterkühlung und hohem Pumpenstrom (Referenz: 8 Pumpen, 2°C Marge)
+  const subcoolingMargin = PHYSICS.COOLANT_TEMP_BOILING - state.coolantTemperature;
+  if (subcoolingMargin < PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD && state.activeCoolantPumps >= 6) {
+    const cavitationSeverity = Math.max(0, Math.min(1, 1 - subcoolingMargin / PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD));
+    coolingCapacity *= PHYSICS.CAVITATION_FLOW_PENALTY +
+      (1 - PHYSICS.CAVITATION_FLOW_PENALTY) * (1 - cavitationSeverity);
+    if (cavitationSeverity > 0.5 && !hasRecentEvent(events, "KAVITATION IN KÜHLMITTELPUMPEN")) {
+      addEventIfNew(events, elapsed, "KAVITATION IN KÜHLMITTELPUMPEN", 'warning');
+    }
+  }
 
   // ECCS-Effekt: Notkühlsystem reduziert Temperaturen
   const eccsFactor = state.eccsEnabled ? 1.3 : 1.0;
@@ -145,7 +162,7 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
   let steamVoidFraction = 0;
   if (coolantTemperature > PHYSICS.COOLANT_TEMP_BOILING) {
     steamVoidFraction = Math.min(1,
-      (coolantTemperature - PHYSICS.COOLANT_TEMP_BOILING) / 100
+      (coolantTemperature - PHYSICS.COOLANT_TEMP_BOILING) / PHYSICS.VOID_FORMATION_RANGE
     );
   }
 
@@ -242,6 +259,15 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     newSafetyRods = Math.min(PHYSICS.SAFETY_RODS_MAX, safetyRods + 20 * DT);
   }
 
+  // AZ-5 graduelle Stabeinfahrt (0,4 m/s, ~18 Sekunden für vollständiges Einfahren)
+  if (az5Active) {
+    const rodsPerTick = PHYSICS.AZ5_ROD_INSERTION_RATE * DT;
+    newSafetyRods = Math.min(PHYSICS.SAFETY_RODS_MAX, newSafetyRods + rodsPerTick);
+    manualRods = Math.min(PHYSICS.MANUAL_RODS_MAX, manualRods + rodsPerTick);
+    autoRods = Math.min(PHYSICS.AUTO_RODS_MAX, autoRods + rodsPerTick);
+    shortenedRods = Math.min(PHYSICS.SHORTENED_RODS_MAX, shortenedRods + rodsPerTick);
+  }
+
   // --- 3h. Spielende-Bedingungen ---
   let isExploded = state.isExploded;
   let testCompleted = state.testCompleted;
@@ -335,39 +361,24 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
 }
 
 /**
- * AZ-5 Notabschalter: Alle Stäbe einfahren + Graphit-Spitzen-Effekt.
+ * AZ-5 Notabschalter: Graduelle Stabeinfahrt; der Graphit-Tip-Effekt ist nur
+ * unter instabilen Niedrigleistungsbedingungen gefaehrlich.
  */
 export function triggerAZ5(state: ReactorState): Partial<ReactorState> {
   const events = [...state.events];
   events.push({
     timestamp: state.elapsedSeconds,
-    message: "AZ-5 AKTIVIERT — GRAPHIT-SPITZEN-EFFEKT DETEKTIERT",
+    message: "AZ-5 AKTIVIERT — NOTABSCHALTUNG EINGELEITET",
     severity: 'critical',
   });
 
-  let isExploded = state.isExploded;
-
-  // Wenn Leistung > 80% vor AZ-5: Spike löst Kernschmelze aus
-  if (state.thermalPower > PHYSICS.MAX_THERMAL_POWER * 0.8) {
-    isExploded = true;
-    events.push({
-      timestamp: state.elapsedSeconds,
-      message: "KERNSCHMELZE — REAKTOR 4 EXPLODIERT",
-      severity: 'alarm',
-    });
-  }
-
+  // Stäbe werden NICHT sofort eingefahren — graduelle Einfahrt über 18 Sekunden (0,4 m/s)
+  // Die Stabposition wird in calculateNextState schrittweise erhöht
   return {
-    controlRods: PHYSICS.MAX_CONTROL_RODS,
-    manualRods: PHYSICS.MANUAL_RODS_MAX,
-    autoRods: PHYSICS.AUTO_RODS_MAX,
-    shortenedRods: PHYSICS.SHORTENED_RODS_MAX,
-    safetyRods: PHYSICS.SAFETY_RODS_MAX,
     az5Active: true,
-    az5Timer: PHYSICS.AZ5_GRAPHIT_SPIKE_DURATION,
+    az5Timer: PHYSICS.AZ5_FULL_INSERTION_TIME,
     az5PrePower: state.thermalPower,
     events,
-    isExploded,
   };
 }
 
@@ -386,6 +397,44 @@ export function triggerBAZ(state: ReactorState): Partial<ReactorState> {
     bazTriggered: true,
     events,
   };
+}
+
+function calculateAz5GraphiteSpikeFactor(state: ReactorState, az5Timer: number): number {
+  const insertionElapsed = PHYSICS.AZ5_FULL_INSERTION_TIME - az5Timer;
+  if (insertionElapsed >= PHYSICS.AZ5_GRAPHIT_SPIKE_DURATION) {
+    return 1;
+  }
+
+  const spikePhase = 1 - insertionElapsed / PHYSICS.AZ5_GRAPHIT_SPIKE_DURATION;
+  const lowPowerSeverity = clamp01(
+    (PHYSICS.AZ5_GRAPHIT_POWER_THRESHOLD - state.thermalPower) /
+    PHYSICS.AZ5_GRAPHIT_POWER_THRESHOLD
+  );
+  const lowMarginSeverity = clamp01(
+    (PHYSICS.AZ5_GRAPHIT_MARGIN_THRESHOLD - state.reactivityMargin) /
+    (PHYSICS.AZ5_GRAPHIT_MARGIN_THRESHOLD - PHYSICS.OZR_MINIMUM_SAFE)
+  );
+  const voidSeverity = clamp01(
+    (state.steamVoidFraction - PHYSICS.AZ5_GRAPHIT_VOID_THRESHOLD) /
+    (1 - PHYSICS.AZ5_GRAPHIT_VOID_THRESHOLD)
+  );
+
+  // Positive scram becomes relevant only when low power, low OZR and voiding
+  // line up at the same time. In a healthy core, AZ-5 should shut the reactor down.
+  const spikeSeverity = clamp01(lowPowerSeverity * (lowMarginSeverity * 0.6 + voidSeverity * 0.4));
+  if (spikeSeverity <= 0) {
+    return 1;
+  }
+
+  const peakMultiplier = state.reactivityMargin < PHYSICS.OZR_MINIMUM_SAFE
+    ? PHYSICS.AZ5_LOW_ORM_MULTIPLIER
+    : PHYSICS.AZ5_GRAPHIT_POWER_MULTIPLIER;
+
+  return 1 + (peakMultiplier - 1) * spikeSeverity * spikePhase;
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
 }
 
 function hasRecentEvent(events: GameEvent[], message: string): boolean {

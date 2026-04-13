@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   LineChart,
   Line,
@@ -23,6 +23,18 @@ interface DataPoint {
   pressure: number;
 }
 
+interface AxisSpec {
+  domain: [number, number];
+  ticks: number[];
+}
+
+interface AxisSpecOptions {
+  fallbackValue: number;
+  minimum?: number;
+  minSpan: number;
+  tickCount?: number;
+}
+
 const MAX_POINTS = 60;
 
 const graphContainerStyle = {
@@ -39,6 +51,38 @@ const labelStyle = {
   padding: '2px 8px',
   borderBottom: '1px solid var(--border)',
 };
+
+export function buildAxisSpec(
+  values: number[],
+  { fallbackValue, minimum, minSpan, tickCount = 5 }: AxisSpecOptions,
+): AxisSpec {
+  const sourceValues = values.length > 0 ? values : [fallbackValue];
+  const minValue = Math.min(...sourceValues);
+  const maxValue = Math.max(...sourceValues);
+  const center = (minValue + maxValue) / 2;
+
+  let domainMin = center - minSpan / 2;
+  let domainMax = center + minSpan / 2;
+
+  if (minimum !== undefined && domainMin < minimum) {
+    domainMax += minimum - domainMin;
+    domainMin = minimum;
+  }
+
+  const step = tickCount > 1 ? (domainMax - domainMin) / (tickCount - 1) : 0;
+  const ticks = Array.from({ length: tickCount }, (_, index) => (
+    index === tickCount - 1 ? domainMax : domainMin + step * index
+  ));
+
+  return {
+    domain: [domainMin, domainMax],
+    ticks,
+  };
+}
+
+function formatAxisTick(value: number): string {
+  return Math.abs(value) >= 100 ? Math.round(value).toString() : value.toFixed(1);
+}
 
 export default function LiveGraphPanel({ neutronFlux, coreTemperature, steamPressure }: LiveGraphPanelProps) {
   const [history, setHistory] = useState<DataPoint[]>([]);
@@ -59,6 +103,24 @@ export default function LiveGraphPanel({ neutronFlux, coreTemperature, steamPres
       return next.length > MAX_POINTS ? next.slice(-MAX_POINTS) : next;
     });
   }, [neutronFlux, coreTemperature, steamPressure]);
+
+  const temperatureAxis = useMemo(
+    () => buildAxisSpec(history.map((point) => point.temp), {
+      fallbackValue: coreTemperature,
+      minimum: 0,
+      minSpan: 240,
+    }),
+    [history, coreTemperature],
+  );
+
+  const pressureAxis = useMemo(
+    () => buildAxisSpec(history.map((point) => point.pressure), {
+      fallbackValue: steamPressure,
+      minimum: 0,
+      minSpan: 24,
+    }),
+    [history, steamPressure],
+  );
 
   const tickStyle = {
     fontFamily: 'Share Tech Mono, monospace',
@@ -115,7 +177,13 @@ export default function LiveGraphPanel({ neutronFlux, coreTemperature, steamPres
         <ResponsiveContainer width="100%" height={100}>
           <LineChart data={history}>
             <XAxis dataKey="tick" hide />
-            <YAxis domain={['auto', 'auto']} tick={tickStyle} width={45} />
+            <YAxis
+              domain={temperatureAxis.domain}
+              ticks={temperatureAxis.ticks}
+              tick={tickStyle}
+              tickFormatter={formatAxisTick}
+              width={45}
+            />
             <ReferenceLine y={1200} stroke="var(--alarm-red)" strokeDasharray="3 3" />
             <Line
               type="monotone"
@@ -135,7 +203,13 @@ export default function LiveGraphPanel({ neutronFlux, coreTemperature, steamPres
         <ResponsiveContainer width="100%" height={100}>
           <LineChart data={history}>
             <XAxis dataKey="tick" hide />
-            <YAxis domain={['auto', 'auto']} tick={tickStyle} width={35} />
+            <YAxis
+              domain={pressureAxis.domain}
+              ticks={pressureAxis.ticks}
+              tick={tickStyle}
+              tickFormatter={formatAxisTick}
+              width={35}
+            />
             <ReferenceLine y={80} stroke="var(--warning-yellow)" strokeDasharray="3 3" />
             <Line
               type="monotone"

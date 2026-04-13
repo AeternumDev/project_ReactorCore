@@ -24,11 +24,13 @@ export const PHYSICS = {
   XENON_BUILD_DELAY: 30,            // Sekunden bis Xenon-Aufbau nach Leistungsabfall
   XENON_DECAY_RATE: 0.0015,         // Abbaurate bei hoher Leistung
   XENON_BUILD_RATE: 0.003,          // Aufbaurate unter 700 MW (verschärft)
-  XENON_MAX_REACTIVITY_PENALTY: 0.35, // Max Reaktivitätsstrafe bei Xenon-Vergiftung
+  XENON_MAX_REACTIVITY_PENALTY: 0.9,  // Stark genug, um bei 200 MWth fast alle Stäbe zu erfordern
 
   // Kühlmittel
+  // 270°C = Kaltseite (Basis). Bei 1500 MWth berechnet sich 284°C (Referenz-Eintritt).
+  // Siedepunkt 286°C bei 6,4 MPa → 2°C Marge bei ~1500 MWth.
   COOLANT_TEMP_NOMINAL: 270,
-  COOLANT_TEMP_BOILING: 284,
+  COOLANT_TEMP_BOILING: 286,
   COOLANT_FLOW_NOMINAL: 7000,
   COOLANT_FLOW_PER_PUMP: 875,
 
@@ -44,13 +46,20 @@ export const PHYSICS = {
   STEAM_PRESSURE_WARNING: 80,
   STEAM_PRESSURE_CRITICAL: 95,
 
-  // Positiver Dampfblasenkoeffizient (RBMK-Konstruktionsfehler)
-  VOID_COEFFICIENT: 0.0015,
+  // Positiver Dampfblasenkoeffizient (RBMK-Konstruktionsfehler, +4,5 bis +5,0 β)
+  VOID_COEFFICIENT: 0.005,
+  VOID_FORMATION_RANGE: 30,          // °C über Siedepunkt für vollen Dampfblasenanteil
+  LOW_POWER_VOID_AMPLIFICATION: 3,   // Verstärkung des Void-Koeffizienten bei niedriger Leistung
 
   // AZ-5 Graphit-Spitzen-Effekt (5 Sekunden — "Point of No Return")
   AZ5_GRAPHIT_SPIKE_DURATION: 5,
   AZ5_GRAPHIT_POWER_MULTIPLIER: 2.5,
   AZ5_LOW_ORM_MULTIPLIER: 5.0,      // Verstärkter Spike wenn ORM < 15 ("un-trippable")
+  AZ5_GRAPHIT_POWER_THRESHOLD: 700,  // Unterhalb davon wird der Tip-Effekt relevant
+  AZ5_GRAPHIT_MARGIN_THRESHOLD: 30,  // Niedrige OZR macht den positiven Scram gefaehrlich
+  AZ5_GRAPHIT_VOID_THRESHOLD: 0.08,  // Bedeutende Void-Bildung im Kern vor AZ-5
+  AZ5_FULL_INSERTION_TIME: 18,       // Sekunden für vollständiges Einfahren (0,4 m/s)
+  AZ5_ROD_INSERTION_RATE: 12,        // Stäbe pro Sekunde während AZ-5 (211/18 ≈ 12)
 
   // BAZ — Schnelle Notabschaltung
   BAZ_POWER_THRESHOLD: 1.1,        // 110% des Sollwerts
@@ -62,7 +71,12 @@ export const PHYSICS = {
   TURBINE_MAX_SPEED: 3600,         // RPM (Überdrehzahl)
   TURBINE_EFFICIENCY: 0.33,        // 33% thermisch → elektrisch
   TURBINE_SPINDOWN_RATE: 50,       // RPM/s Auslauf
+  // Leistungsexkursion
+  PEAK_EXCURSION_POWER: 33000,       // Spitzenleistung bei Exkursion (>33.000 MWth Referenz)
 
+  // Kavitation
+  CAVITATION_SUBCOOLING_THRESHOLD: 3, // °C Unterkühlung unter der Kavitation beginnt
+  CAVITATION_FLOW_PENALTY: 0.85,      // Durchfluss-Multiplikator bei Kavitation
   // Trommelabscheider
   DRUM_LEVEL_NOMINAL: 50,          // %
   DRUM_LEVEL_LOW: 20,              // %

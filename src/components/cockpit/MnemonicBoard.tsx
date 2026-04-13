@@ -86,8 +86,11 @@ function getChannelRodColor(
   isExploded: boolean,
 ): string {
   if (isExploded) return '#222';
+  if (channel.channelType === 'sensor') {
+    return channel.layoutColor || '#0067ce';
+  }
   if (channel.channelType === 'rod' && channel.rodType) {
-    return ROD_COLORS[channel.rodType];
+    return channel.layoutColor || ROD_COLORS[channel.rodType];
   }
   return '#2a3a2a';
 }
@@ -228,7 +231,9 @@ export default function MnemonicBoard({
         }}>
           {hoveredChannel.id} — {hoveredChannel.channelType === 'rod'
             ? `${hoveredChannel.rodType} (Klick: ausfahren / Rechtsklick: einfahren)`
-            : 'Brennstoffkanal'}
+            : hoveredChannel.channelType === 'sensor'
+              ? 'Detektorkanal'
+              : 'Brennstoffkanal'}
         </div>
       )}
       {!hoveredChannel && (
@@ -269,17 +274,22 @@ export default function MnemonicBoard({
               case 'neutron':
                 fill = getChannelNeutronColor(ch, neutronFlux, isExploded);
                 if (ch.channelType === 'rod') {
-                  fill = ROD_COLORS[ch.rodType!];
+                  fill = ch.layoutColor || ROD_COLORS[ch.rodType!];
+                  opacity = 0.5;
+                }
+                if (ch.channelType === 'sensor') {
+                  fill = ch.layoutColor || '#0067ce';
                   opacity = 0.5;
                 }
                 break;
               case 'rods':
                 fill = getChannelRodColor(ch, isExploded);
-                opacity = ch.channelType === 'rod' ? 0.9 : 0.3;
+                opacity = ch.channelType === 'rod' || ch.channelType === 'sensor' ? 0.9 : 0.3;
                 break;
             }
 
             const isRod = ch.channelType === 'rod';
+            const isSensor = ch.channelType === 'sensor';
             const isClickable = isRod && !isExploded &&
               ch.rodType !== 'AZ' && ch.rodType !== 'LAR';
 
@@ -292,7 +302,7 @@ export default function MnemonicBoard({
                 height={CELL_PX}
                 fill={fill}
                 opacity={opacity}
-                stroke={hoveredChannel === ch ? '#fff' : isRod ? '#333' : 'none'}
+                stroke={hoveredChannel === ch ? '#fff' : isRod || isSensor ? '#333' : 'none'}
                 strokeWidth={hoveredChannel === ch ? 1 : 0.3}
                 style={{ cursor: isClickable ? 'pointer' : 'default' }}
                 onMouseEnter={() => setHoveredChannel(ch)}

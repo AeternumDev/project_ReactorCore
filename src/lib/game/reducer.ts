@@ -4,7 +4,7 @@ import { PHYSICS } from "@/lib/physics/constants";
 import { calculateScore } from "./scoring";
 
 export const INITIAL_STATE: ReactorState = {
-  controlRods: 130,
+  controlRods: 145,
   activeCoolantPumps: 8,
   eccsEnabled: false,
   coolantFlowRate: 8 * PHYSICS.COOLANT_FLOW_PER_PUMP,
@@ -13,7 +13,7 @@ export const INITIAL_STATE: ReactorState = {
   manualRods: 10,
   autoRods: 6,
   shortenedRods: 20,
-  safetyRods: 94,
+  safetyRods: 109,
 
   thermalPower: 1500,
   neutronFlux: 1500 / PHYSICS.MAX_THERMAL_POWER,
@@ -45,8 +45,8 @@ export const INITIAL_STATE: ReactorState = {
   powerMode: 'manual',
   powerSetpoint: 700,
 
-  // OZR — mit 130 Stäben eingefahren, gesund
-  reactivityMargin: 130,
+  // OZR — mit 145 Stäben eingefahren, gesund
+  reactivityMargin: 145,
 
   // BAZ (historisch: war deaktiviert/blockiert durch Bediener)
   bazArmed: false,

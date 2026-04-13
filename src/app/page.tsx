@@ -107,15 +107,15 @@ export default function Home() {
 
           <p style={{ marginBottom: '8px' }}>
             <span style={{ color: 'var(--warning-yellow)' }}>AUSGANGSLAGE:</span>{' '}
-            Der Reaktor wurde auf 200&nbsp;MW thermisch heruntergefahren.
-            Durch das Absenken der Leistung hat sich Xenon-135 im Kern akkumuliert
-            und bremst die Kettenreaktion. OZR (Operativer Reaktivitätsvorrat)
-            liegt nahe der Mindestgrenze.
+            Der Reaktor läuft bei 1500&nbsp;MW thermisch und wird auf 700&nbsp;MW heruntergefahren.
+            Beim Absenken der Leistung wird sich Xenon-135 im Kern akkumulieren
+            und die Kettenreaktion bremsen. OZR (Operativer Reaktivitätsvorrat)
+            ist noch im sicheren Bereich.
           </p>
 
           <p style={{ marginBottom: '8px' }}>
             <span style={{ color: 'var(--amber)' }}>ZIEL:</span>{' '}
-            Stabilisiere die Leistung im Bereich <strong style={{ color: '#fff' }}>150–250&nbsp;MW</strong> und
+            Stabilisiere die Leistung im Bereich <strong style={{ color: '#fff' }}>700–1000&nbsp;MW</strong> und
             halte sie dort, während der Turbinen-Auslauftest durchgeführt wird.
           </p>
 
@@ -137,7 +137,7 @@ export default function Home() {
 
           <p>
             <span style={{ color: 'var(--safe-green)' }}>ERFOLG:</span>{' '}
-            Stabile Leistung bei 150–250&nbsp;MW über die gesamte Testdauer.
+            Stabile Leistung bei 700–1000&nbsp;MW über die gesamte Testdauer.
             Xenon-Vergiftung unter Kontrolle. Kein Auslösen der Notabschaltung (AZ-5) nötig.
           </p>
         </div>

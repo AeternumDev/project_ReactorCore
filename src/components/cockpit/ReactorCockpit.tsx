@@ -191,6 +191,11 @@ export default function ReactorCockpit() {
               isExploded={state.isExploded}
               az5Active={state.az5Active}
               az5Timer={state.az5Timer}
+              coolantTemperature={state.coolantTemperature}
+              fuelTemperature={state.fuelTemperature}
+              steamPressure={state.steamPressure}
+              neutronFlux={state.neutronFlux}
+              reactivityMargin={state.reactivityMargin}
             />
             <MnemonicBoard
               thermalPower={state.thermalPower}
@@ -224,6 +229,9 @@ export default function ReactorCockpit() {
             eccsEnabled={state.eccsEnabled}
             activeCoolantPumps={state.activeCoolantPumps}
             pumpStates={state.pumpStates}
+            fuelTemperature={state.fuelTemperature}
+            generatorOutput={state.generatorOutput}
+            reactivityMargin={state.reactivityMargin}
           />
 
           {/* ControlRods (left) + EventLog + Checklist (right) under synoptic */}

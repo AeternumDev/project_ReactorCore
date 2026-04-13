@@ -5,7 +5,38 @@ import { gameReducer, INITIAL_STATE } from "@/lib/game/reducer";
 import { ReactorState } from "@/lib/physics/types";
 
 function createTestState(overrides: Partial<ReactorState> = {}): ReactorState {
-  return { ...INITIAL_STATE, isRunning: true, ...overrides };
+  const state = { ...INITIAL_STATE, isRunning: true, ...overrides };
+  const hasRodOverride =
+    Object.prototype.hasOwnProperty.call(overrides, 'manualRods') ||
+    Object.prototype.hasOwnProperty.call(overrides, 'autoRods') ||
+    Object.prototype.hasOwnProperty.call(overrides, 'shortenedRods') ||
+    Object.prototype.hasOwnProperty.call(overrides, 'safetyRods');
+
+  if (hasRodOverride) {
+    const totalRods = state.manualRods + state.autoRods + state.shortenedRods + state.safetyRods;
+    state.controlRods = totalRods;
+    state.reactivityMargin = totalRods;
+  }
+
+  return state;
+}
+
+function advanceTicks(state: ReactorState, tickCount: number): ReactorState {
+  let current = state;
+
+  for (let tick = 0; tick < tickCount; tick += 1) {
+    current = {
+      ...current,
+      ...calculateNextState(current),
+      elapsedSeconds: current.elapsedSeconds + PHYSICS.TICK_INTERVAL_MS / 1000,
+    };
+
+    if (current.isExploded) {
+      break;
+    }
+  }
+
+  return current;
 }
 
 describe("Physik-Engine", () => {
@@ -78,23 +109,55 @@ describe("Physik-Engine", () => {
     expect(nextWithVoid.neutronFlux!).toBeGreaterThan(nextNoVoid.neutronFlux!);
   });
 
-  test("AZ-5 erzeugt Graphit-Spitzen-Effekt (kurzfristiger Leistungsanstieg)", () => {
+  test("AZ-5 faehrt einen gesunden Reaktor herunter statt sofortiger Kernschmelze", () => {
     const state = createTestState({
-      thermalPower: 500,
-      neutronFlux: 0.15,
-      controlRods: 100,
+      thermalPower: 1500,
+      neutronFlux: 1500 / PHYSICS.MAX_THERMAL_POWER,
+      xenonConcentration: 0,
+      steamVoidFraction: 0,
+      coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
     });
-    const az5Result = triggerAZ5(state);
-    expect(az5Result.controlRods).toBe(211);
-    expect(az5Result.az5Active).toBe(true);
-    expect(az5Result.az5Timer).toBe(PHYSICS.AZ5_GRAPHIT_SPIKE_DURATION);
-    expect(az5Result.events!.some(e => e.message.includes("AZ-5 AKTIVIERT"))).toBe(true);
+    const az5State = { ...state, ...triggerAZ5(state) };
 
-    // After AZ5 triggered, next tick should show flux spike
-    const stateAfterAZ5 = { ...state, ...az5Result };
-    const next = calculateNextState(stateAfterAZ5);
-    // Neutron flux should be elevated due to graphite spike multiplier
-    expect(next.neutronFlux!).toBeGreaterThan(state.neutronFlux);
+    expect(az5State.az5Active).toBe(true);
+    expect(az5State.az5Timer).toBe(PHYSICS.AZ5_FULL_INSERTION_TIME);
+    expect(az5State.events.some(e => e.message.includes("AZ-5 AKTIVIERT"))).toBe(true);
+
+    const afterScram = advanceTicks(az5State, 12);
+
+    expect(afterScram.isExploded).toBe(false);
+    expect(afterScram.controlRods).toBeGreaterThan(state.controlRods);
+    expect(afterScram.thermalPower).toBeLessThan(state.thermalPower);
+  });
+
+  test("AZ-5 Graphit-Spitzen-Effekt bleibt an Unfallbedingungen gebunden", () => {
+    const healthyCore = createTestState({
+      thermalPower: 1500,
+      neutronFlux: 1500 / PHYSICS.MAX_THERMAL_POWER,
+      xenonConcentration: 0,
+      steamVoidFraction: 0,
+      coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
+    });
+    const accidentCore = createTestState({
+      thermalPower: 200,
+      neutronFlux: 0.06,
+      xenonConcentration: 0,
+      steamVoidFraction: 0.35,
+      coolantTemperature: PHYSICS.COOLANT_TEMP_BOILING + 12,
+      manualRods: 2,
+      autoRods: 2,
+      shortenedRods: 2,
+      safetyRods: 4,
+    });
+
+    const healthyAfterAz5 = calculateNextState({ ...healthyCore, ...triggerAZ5(healthyCore) });
+    const accidentAfterAz5 = calculateNextState({ ...accidentCore, ...triggerAZ5(accidentCore) });
+    const healthyDelta = healthyAfterAz5.neutronFlux! - healthyCore.neutronFlux;
+    const accidentDelta = accidentAfterAz5.neutronFlux! - accidentCore.neutronFlux;
+
+    expect(healthyAfterAz5.neutronFlux!).toBeLessThan(healthyCore.neutronFlux);
+    expect(accidentAfterAz5.neutronFlux!).toBeGreaterThan(accidentCore.neutronFlux);
+    expect(accidentDelta).toBeGreaterThan(Math.abs(healthyDelta) * 10);
   });
 
   test("fuelTemperature >= 2800°C setzt isExploded = true", () => {
@@ -158,7 +221,7 @@ describe("Physik-Engine", () => {
       az5Timer: 0, // post-spike phase
     });
     const next = calculateNextState(state);
-    // With 0.5 multiplier and 0.005 floor, flux should not go to zero
+    // Even after the transient, the model keeps residual heat above zero
     expect(next.neutronFlux!).toBeGreaterThan(0);
   });
 });
