@@ -100,7 +100,8 @@ export default function TestChecklistPanel(props: TestChecklistPanelProps) {
         background: 'var(--surface)',
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
+        maxHeight: '300px',
+        overflow: 'hidden',
       }}
     >
       <div

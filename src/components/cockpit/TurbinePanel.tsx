@@ -9,9 +9,12 @@ interface TurbinePanelProps {
   turbineSpeed: number;
   generatorOutput: number;
   steamPressure: number;
+  feedWaterFlow: number;
+  drumSeparatorLevel: number;
   dispatch: React.Dispatch<
     | { type: 'TOGGLE_TURBINE' }
     | { type: 'SET_TURBINE_VALVE'; payload: number }
+    | { type: 'SET_FEED_WATER'; payload: number }
   >;
 }
 
@@ -21,8 +24,12 @@ export default function TurbinePanel({
   turbineSpeed,
   generatorOutput,
   steamPressure,
+  feedWaterFlow,
+  drumSeparatorLevel,
   dispatch,
 }: TurbinePanelProps) {
+  const drumColor = drumSeparatorLevel < PHYSICS.DRUM_LEVEL_LOW ? 'var(--alarm-red)' :
+    drumSeparatorLevel > PHYSICS.DRUM_LEVEL_HIGH ? 'var(--warning-yellow)' : 'var(--safe-green)';
   const speedPercent = (turbineSpeed / PHYSICS.TURBINE_NOMINAL_SPEED) * 100;
   const isOverspeed = turbineSpeed > PHYSICS.TURBINE_MAX_SPEED * 0.9;
 
@@ -165,6 +172,105 @@ Die Generatorleistung muss die Kühlmittelpumpen während des Auslaufs versorgen
               {generatorOutput.toFixed(0)}
             </div>
             <div style={{ color: '#555', fontSize: '0.55rem' }}>MW(e)</div>
+          </div>
+        </div>
+
+        {/* SPEISEWASSER / TROMMELABSCHEIDER */}
+        <div style={{
+          borderTop: '1px solid var(--border)',
+          paddingTop: '6px',
+          marginTop: '4px',
+        }}>
+          <div style={{
+            fontFamily: 'var(--font-share-tech-mono), monospace',
+            color: 'var(--amber)',
+            fontSize: '0.75rem',
+            marginBottom: '4px',
+            borderBottom: '1px solid var(--border)',
+            paddingBottom: '3px',
+          }}>
+            SPEISEWASSER / TROMMELABSCHEIDER
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+            <span style={{
+              fontFamily: 'var(--font-share-tech-mono), monospace',
+              fontSize: '0.65rem',
+              color: '#888',
+              minWidth: '55px',
+            }}>SPEISEW.</span>
+            <input
+              type="range"
+              min={0}
+              max={1000}
+              step={10}
+              value={feedWaterFlow}
+              onChange={(e) => dispatch({ type: 'SET_FEED_WATER', payload: Number(e.target.value) })}
+              style={{
+                flex: 1,
+                height: '4px',
+                appearance: 'none',
+                background: `linear-gradient(to right, #2288cc ${(feedWaterFlow / 1000) * 100}%, #333 ${(feedWaterFlow / 1000) * 100}%)`,
+                cursor: 'pointer',
+              }}
+            />
+            <span style={{
+              fontFamily: 'var(--font-share-tech-mono), monospace',
+              fontSize: '0.7rem',
+              color: '#2288cc',
+              minWidth: '48px',
+              textAlign: 'right',
+            }}>{feedWaterFlow} L/s</span>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontFamily: 'var(--font-share-tech-mono), monospace',
+            fontSize: '0.65rem',
+          }}>
+            <span style={{ color: '#888', minWidth: '55px' }}>TROMMEL</span>
+            <div style={{
+              flex: 1,
+              height: '12px',
+              background: '#111',
+              border: '1px solid var(--border)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: `${drumSeparatorLevel}%`,
+                background: 'rgba(34,136,204,0.3)',
+                borderTop: `1px solid ${drumColor}`,
+                transition: 'height 0.3s',
+              }} />
+              <div style={{
+                position: 'absolute',
+                bottom: `${PHYSICS.DRUM_LEVEL_LOW}%`,
+                left: 0,
+                right: 0,
+                height: '1px',
+                background: 'var(--alarm-red)',
+                opacity: 0.5,
+              }} />
+              <div style={{
+                position: 'absolute',
+                bottom: `${PHYSICS.DRUM_LEVEL_HIGH}%`,
+                left: 0,
+                right: 0,
+                height: '1px',
+                background: 'var(--warning-yellow)',
+                opacity: 0.5,
+              }} />
+            </div>
+            <span style={{ color: drumColor, minWidth: '30px', textAlign: 'right' }}>
+              {drumSeparatorLevel.toFixed(0)}%
+            </span>
           </div>
         </div>
       </div>

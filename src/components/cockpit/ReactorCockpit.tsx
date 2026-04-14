@@ -158,6 +158,8 @@ export default function ReactorCockpit() {
             turbineSpeed={state.turbineSpeed}
             generatorOutput={state.generatorOutput}
             steamPressure={state.steamPressure}
+            feedWaterFlow={state.feedWaterFlow}
+            drumSeparatorLevel={state.drumSeparatorLevel}
             dispatch={dispatch}
           />
 
@@ -232,6 +234,9 @@ export default function ReactorCockpit() {
             fuelTemperature={state.fuelTemperature}
             generatorOutput={state.generatorOutput}
             reactivityMargin={state.reactivityMargin}
+            xenonConcentration={state.xenonConcentration}
+            bazArmed={state.bazArmed}
+            az5Active={state.az5Active}
           />
 
           {/* ControlRods (left) + EventLog + Checklist (right) under synoptic */}
@@ -298,8 +303,6 @@ export default function ReactorCockpit() {
             autoRods={state.autoRods}
             shortenedRods={state.shortenedRods}
             safetyRods={state.safetyRods}
-            feedWaterFlow={state.feedWaterFlow}
-            drumSeparatorLevel={state.drumSeparatorLevel}
             xenonConcentration={state.xenonConcentration}
             dispatch={dispatch}
           />

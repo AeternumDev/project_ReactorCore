@@ -19,6 +19,9 @@ interface SynopticDiagramProps {
   fuelTemperature: number;
   generatorOutput: number;
   reactivityMargin: number;
+  xenonConcentration: number;
+  bazArmed: boolean;
+  az5Active: boolean;
 }
 
 function flowColor(temp: number): string {
@@ -34,42 +37,33 @@ function pipeWidth(flowRate: number): number {
   return Math.max(2, Math.min(5, (flowRate / PHYSICS.COOLANT_FLOW_NOMINAL) * 3.5));
 }
 
-/* ─── Warning indicator LED — industrial panel style ─── */
-function WarningLight({ cx, cy, label, active, color, blink }: {
-  cx: number; cy: number; label: string;
+/* ─── Chernobyl-style rectangular warning tile — packed tight like the мнемосхема ─── */
+function WarningTile({ x, y, w, h, label, active, color, blink }: {
+  x: number; y: number; w: number; h: number; label: string;
   active: boolean; color: string; blink?: boolean;
 }) {
-  const ledR = 3.5;
   return (
     <g>
-      {/* Recessed bezel */}
-      <rect x={cx - 28} y={cy - 12} width="56" height="24" rx="3"
-        fill={active ? `${color}08` : '#070707'}
-        stroke={active ? `${color}55` : '#1a1a1a'} strokeWidth="1" />
-      <rect x={cx - 27} y={cy - 11} width="54" height="22" rx="2.5"
-        fill="none" stroke="#0a0a0a" strokeWidth="0.5" />
-      {/* LED housing ring */}
-      <circle cx={cx - 18} cy={cy - 2} r={ledR + 2}
-        fill="#0a0a0a" stroke={active ? `${color}44` : '#1a1a1a'} strokeWidth="0.6" />
-      {/* LED bulb */}
-      <circle cx={cx - 18} cy={cy - 2} r={ledR}
-        fill={active ? color : '#111'}
-        stroke={active ? color : '#222'} strokeWidth="0.5"
-        filter={active ? 'url(#ledGlow)' : undefined}
-        opacity={active && blink ? undefined : 1}>
-        {active && blink && (
-          <animate attributeName="opacity" values="1;0.1;1" dur="0.6s" repeatCount="indefinite" />
-        )}
-      </circle>
-      {/* LED highlight dot */}
-      {active && (
-        <circle cx={cx - 19.2} cy={cy - 3.5} r="1.2"
-          fill="white" opacity="0.25" />
+      {active && blink && (
+        <animate attributeName="opacity" values="1;0.22;1" dur="0.48s" repeatCount="indefinite" />
       )}
-      {/* Label */}
-      <text x={cx + 4} y={cy + 1} textAnchor="middle" fill={active ? color : '#3a3a3a'}
-        fontSize="5.5" fontFamily="monospace" fontWeight={active ? 'bold' : 'normal'}
-        letterSpacing="0.3">
+      {/* Outer frame */}
+      <rect x={x} y={y} width={w} height={h}
+        fill={active ? `${color}1a` : '#050505'}
+        stroke={active ? `${color}66` : '#171717'}
+        strokeWidth="0.5" />
+      {/* Subtle inner highlight when active */}
+      {active && (
+        <rect x={x + 1} y={y + 1} width={w - 2} height={h - 2}
+          fill={color} opacity="0.07" />
+      )}
+      {/* Label text */}
+      <text x={x + w / 2} y={y + h / 2 + 2}
+        textAnchor="middle"
+        fill={active ? color : '#1e1e1e'}
+        fontSize="6.5" fontFamily="monospace"
+        fontWeight={active ? 'bold' : 'normal'}
+        letterSpacing="0.15">
         {label}
       </text>
     </g>
@@ -93,6 +87,9 @@ export default function SynopticDiagram({
   fuelTemperature,
   generatorOutput,
   reactivityMargin,
+  xenonConcentration,
+  bazArmed,
+  az5Active,
 }: SynopticDiagramProps) {
   const powerFraction = thermalPower / PHYSICS.MAX_THERMAL_POWER;
   const pColor = flowColor(coolantTemperature);
@@ -101,49 +98,117 @@ export default function SynopticDiagram({
   const steamColor = steamVoidFraction > 0.3 ? '#cc4400' :
     steamVoidFraction > 0.1 ? '#ccaa00' : '#888';
 
-  // Warning states
-  const warnOverpower = thermalPower > PHYSICS.TEST_POWER_MAX;
+  // ── Warning states ──────────────────────────────────────────
+  const warnOverpower   = thermalPower > PHYSICS.TEST_POWER_MAX;
+  const critOverpower   = thermalPower > PHYSICS.MAX_THERMAL_POWER * 0.8;
   const warnCoolantTemp = coolantTemperature > PHYSICS.COOLANT_TEMP_BOILING - 4;
-  const warnFuelTemp = fuelTemperature > PHYSICS.FUEL_TEMP_WARNING;
-  const warnPressure = steamPressure > PHYSICS.STEAM_PRESSURE_WARNING;
-  const warnVoid = steamVoidFraction > 0.1;
-  const warnDrumLow = drumSeparatorLevel < PHYSICS.DRUM_LEVEL_LOW;
-  const warnDrumHigh = drumSeparatorLevel > PHYSICS.DRUM_LEVEL_HIGH;
-  const warnOZR = reactivityMargin < PHYSICS.OZR_WARNING;
-  const warnFlowLow = coolantFlowRate < PHYSICS.BAZ_COOLANT_FLOW_MIN;
-  const warnTurbineOver = turbineSpeed > PHYSICS.TURBINE_MAX_SPEED * 0.9;
-
-  const critOverpower = thermalPower > PHYSICS.MAX_THERMAL_POWER * 0.8;
   const critCoolantTemp = coolantTemperature > PHYSICS.COOLANT_TEMP_BOILING;
-  const critFuelTemp = fuelTemperature > PHYSICS.FUEL_TEMP_MELTDOWN * 0.7;
-  const critPressure = steamPressure > PHYSICS.STEAM_PRESSURE_CRITICAL;
-  const critOZR = reactivityMargin < PHYSICS.OZR_MINIMUM_SAFE;
+  const warnFuelTemp    = fuelTemperature > PHYSICS.FUEL_TEMP_WARNING;
+  const critFuelTemp    = fuelTemperature > PHYSICS.FUEL_TEMP_MELTDOWN * 0.7;
+  const warnPressure    = steamPressure > PHYSICS.STEAM_PRESSURE_WARNING;
+  const critPressure    = steamPressure > PHYSICS.STEAM_PRESSURE_CRITICAL;
+  const warnVoid        = steamVoidFraction > 0.1;
+  const critVoid        = steamVoidFraction > 0.3;
+  const warnDrumLow     = drumSeparatorLevel < PHYSICS.DRUM_LEVEL_LOW;
+  const warnDrumHigh    = drumSeparatorLevel > PHYSICS.DRUM_LEVEL_HIGH;
+  const warnOZR         = reactivityMargin < PHYSICS.OZR_WARNING;
+  const critOZR         = reactivityMargin < PHYSICS.OZR_MINIMUM_SAFE;
+  const warnFlowLow     = coolantFlowRate < PHYSICS.BAZ_COOLANT_FLOW_MIN;
+  const warnTurbineOver = turbineSpeed > PHYSICS.TURBINE_MAX_SPEED * 0.9;
+  const warnXenon       = xenonConcentration > 0.4;
+  const critXenon       = xenonConcentration > 0.7;
 
   const coreColor = critOverpower ? '#ff2020' : warnOverpower ? '#cc8800' : '#448844';
-  const coreGlow = powerFraction > 0.5
+  const coreGlow  = powerFraction > 0.5
     ? `rgba(${critOverpower ? '255,32,32' : '204,136,0'},${Math.min(powerFraction * 0.3, 0.25)})`
     : 'none';
 
-  // Turbine spin: animation duration inversely proportional to speed
-  const turbineSpinDur = turbineConnected && turbineSpeed > 5 ? Math.max(2, 300 / turbineSpeed) : 0;
+  const turbineSpinDur = turbineConnected && turbineSpeed > 5
+    ? Math.max(2, 300 / turbineSpeed) : 0;
 
-  // Layout constants — expanded for clarity
+  // ── Layout constants ─────────────────────────────────────────
   const W = 620;
-  const H = 340;
-  const WARN_H = 50; // warning panel height
+  const H = 398;          // taller to accommodate larger warning panel
+  const WARN_H = 108;     // 4 rows × 20px + header 22px + padding
 
-  // Component centers — spread apart for less overlap
-  const CORE = { x: 90, y: 175, w: 80, h: 110 };
-  const DRUM = { x: 248, y: 160, w: 72, h: 85 };
-  const TURB = { x: 420, y: 140, r: 34 };
-  const GEN = { x: 530, y: 140, w: 50, h: 42 };
-  const COND = { x: 420, y: 275, w: 50, h: 28 };
-  const ECCS = { x: 22, y: 145, w: 36, h: 54 };
+  // Component centres — all y-coords shifted +28 vs original
+  const CORE = { x: 90,  y: 233, w: 80,  h: 110 };
+  const DRUM = { x: 248, y: 218, w: 72,  h: 85  };
+  const TURB = { x: 420, y: 198, r: 34  };
+  const GEN  = { x: 530, y: 198, w: 50,  h: 42  };
+  const COND = { x: 420, y: 333, w: 50,  h: 28  };
+  const ECCS = { x: 22,  y: 203, w: 36,  h: 54  };
 
-  // Pipe junction Y
-  const hotY = CORE.y - 22;
-  const coldReturnY = 310;
-  const coldLeftX = CORE.x - CORE.w / 2 - 10;
+  const hotY        = CORE.y - 22;       // 211
+  const coldReturnY = 368;
+  const coldLeftX   = CORE.x - CORE.w / 2 - 10;  // 40
+
+  // ── Tile grid geometry ───────────────────────────────────────
+  // 11 columns × 4 rows, tiles packed with gaps
+  const TW = 54;   // tile width
+  const TH = 19;   // tile height (was 14 — bigger for readability)
+  const TP = 55;   // column pitch  (TW + 1)
+  const TR = 20;   // row pitch     (was 15)
+  const TX0 = 3;   // first tile left edge
+  const TY0 = 22;  // first tile top edge (below header line)
+
+  const tx = (col: number) => TX0 + col * TP;
+  const ty = (row: number) => TY0 + row * TR;
+
+  // ── 44 warning tiles — 4 rows × 11 ──────────────────────────
+  const tiles = [
+    // Row 0 — Leistung & Reaktivität
+    { label: 'ÜBERTG-W',  active: warnOverpower,    color: '#ffd700', blink: true  },
+    { label: 'ÜBERTG-KR', active: critOverpower,    color: '#ff2020', blink: true  },
+    { label: 'OZR-WARN',  active: warnOZR,          color: '#ffd700', blink: false },
+    { label: 'OZR-KRIT',  active: critOZR,          color: '#ff2020', blink: true  },
+    { label: 'XE-VERGIF', active: warnXenon,        color: '#ff8800', blink: false },
+    { label: 'XE-KRIT',   active: critXenon,        color: '#ff2020', blink: true  },
+    { label: 'AZ-5 AKT',  active: az5Active,        color: '#ff2020', blink: true  },
+    { label: 'BAZ-BLKD',  active: !bazArmed,        color: '#ff5533', blink: false },
+    { label: 'ECCS-AUS',  active: !eccsEnabled,     color: '#ff2020', blink: true  },
+    { label: 'NOTKÜHL',   active: !eccsEnabled && (critOverpower || critCoolantTemp), color: '#ff2020', blink: true },
+    { label: 'NOTSTROM',  active: generatorOutput < 5 && turbineConnected, color: '#ff8800', blink: false },
+
+    // Row 1 — Thermik
+    { label: 'KM-TEMP↑',  active: warnCoolantTemp,  color: '#ffd700', blink: true  },
+    { label: 'KM-SIED',   active: critCoolantTemp,  color: '#ff2020', blink: true  },
+    { label: 'BE-TEMP↑',  active: warnFuelTemp,     color: '#ffd700', blink: warnFuelTemp },
+    { label: 'BE-KRIT',   active: critFuelTemp,     color: '#ff2020', blink: true  },
+    { label: 'VOID-W',    active: warnVoid,         color: '#ffd700', blink: false },
+    { label: 'VOID-KRIT', active: critVoid,         color: '#ff2020', blink: true  },
+    { label: 'KERN-HEIT', active: fuelTemperature > 1000, color: '#ff8800', blink: false },
+    { label: 'KAVITAT',   active: coolantTemperature > PHYSICS.COOLANT_TEMP_BOILING - PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD, color: '#ff8800', blink: false },
+    { label: 'KÜHL-ABF',  active: coolantFlowRate < PHYSICS.COOLANT_FLOW_NOMINAL * 0.7, color: '#ffd700', blink: false },
+    { label: 'DAMPF-VD',  active: steamVoidFraction > 0.15, color: '#ff8800', blink: false },
+    { label: 'T-DELTA↑',  active: fuelTemperature - coolantTemperature > 700, color: '#ff8800', blink: false },
+
+    // Row 2 — Dampf & Wasser
+    { label: 'DRUCK-W',   active: warnPressure,     color: '#ffd700', blink: false },
+    { label: 'DRUCK-KR',  active: critPressure,     color: '#ff2020', blink: true  },
+    { label: 'TROMM-LO',  active: warnDrumLow,      color: '#ffd700', blink: warnDrumLow },
+    { label: 'TROMM-HI',  active: warnDrumHigh,     color: '#ffd700', blink: warnDrumHigh },
+    { label: 'SPEISEW-W', active: feedWaterFlow < 200, color: '#ffd700', blink: false },
+    { label: 'SPEISEW-HI',active: feedWaterFlow > 800, color: '#ffd700', blink: false },
+    { label: 'DAMPF-LTG', active: steamPressure > 75, color: '#ff8800', blink: false },
+    { label: 'KM-FLUSS↓', active: warnFlowLow,      color: '#ffd700', blink: true  },
+    { label: 'UMLAUF',    active: activeCoolantPumps < 6, color: '#ffd700', blink: false },
+    { label: 'TRB-AUSL',  active: turbineValveOpen === 0 && turbineConnected && turbineSpeed > 100, color: '#888888', blink: false },
+    { label: 'LECK-SIG',  active: steamVoidFraction > 0.2 && fuelTemperature > 900, color: '#ff2020', blink: true  },
+
+    // Row 3 — Pumpen & Systeme
+    { label: 'MCP-1',     active: !pumpStates[0],   color: '#ff2020', blink: !pumpStates[0] },
+    { label: 'MCP-2',     active: !pumpStates[1],   color: '#ff2020', blink: !pumpStates[1] },
+    { label: 'MCP-3',     active: !pumpStates[2],   color: '#ff2020', blink: !pumpStates[2] },
+    { label: 'MCP-4',     active: !pumpStates[3],   color: '#ff2020', blink: !pumpStates[3] },
+    { label: 'MCP-5',     active: !pumpStates[4],   color: '#ff2020', blink: !pumpStates[4] },
+    { label: 'MCP-6',     active: !pumpStates[5],   color: '#ff2020', blink: !pumpStates[5] },
+    { label: 'MCP-7',     active: !pumpStates[6],   color: '#ff2020', blink: !pumpStates[6] },
+    { label: 'MCP-8',     active: !pumpStates[7],   color: '#ff2020', blink: !pumpStates[7] },
+    { label: 'TURB-DRZ',  active: warnTurbineOver,  color: '#ffd700', blink: true  },
+    { label: 'GEN-AUS',   active: generatorOutput < 10 && turbineConnected, color: '#ff5533', blink: false },
+    { label: 'NETZ-V',    active: generatorOutput < 5, color: '#ff2020', blink: false },
+  ];
 
   return (
     <div style={{
@@ -185,80 +250,69 @@ export default function SynopticDiagram({
             markerWidth="5" markerHeight="5" orient="auto">
             <path d="M0,0 L8,4 L0,8 Z" fill="#2288cc" />
           </marker>
-          {/* Glow filters */}
-          <filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2" result="b"/>
             <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
-          <filter id="glowStrong"><feGaussianBlur stdDeviation="3.5" result="b"/>
+          <filter id="glowStrong">
+            <feGaussianBlur stdDeviation="3.5" result="b"/>
             <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
-          {/* LED glow for warning lights */}
           <filter id="ledGlow">
             <feGaussianBlur stdDeviation="1.5" result="b"/>
             <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
-          {/* Subtle inner shadow for panels */}
-          <filter id="innerShadow">
-            <feOffset dx="0" dy="1" />
-            <feGaussianBlur stdDeviation="1" result="offset-blur"/>
-            <feComposite operator="out" in="SourceGraphic" in2="offset-blur" result="inverse"/>
-            <feFlood floodColor="#000" floodOpacity="0.3" result="color"/>
-            <feComposite operator="in" in="color" in2="inverse" result="shadow"/>
-            <feComposite operator="over" in="shadow" in2="SourceGraphic"/>
-          </filter>
-          {/* Pipe flow animation pattern */}
           <pattern id="flowPattern" patternUnits="userSpaceOnUse" width="12" height="4">
             <rect width="12" height="4" fill="none"/>
             <rect width="6" height="4" fill={pColor} opacity="0.15">
               <animate attributeName="x" values="0;12" dur="0.8s" repeatCount="indefinite"/>
             </rect>
           </pattern>
-          {/* Core heat gradient */}
           <radialGradient id="coreHeat" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor={critOverpower ? '#ff2020' : warnOverpower ? '#cc8800' : '#448844'} stopOpacity={powerFraction * 0.15}/>
             <stop offset="100%" stopColor="transparent" stopOpacity="0"/>
           </radialGradient>
         </defs>
 
-        {/* ═══════════════════════════════════ */}
-        {/*  WARNANZEIGEN — INDUSTRIAL LED PANEL */}
-        {/* ═══════════════════════════════════ */}
-        {/* Panel background with beveled edge */}
-        <rect x="2" y="2" width={W - 4} height={WARN_H} rx="3"
-          fill="#060606" stroke="#1e1e1e" strokeWidth="1" />
-        <rect x="3" y="3" width={W - 6} height={WARN_H - 2} rx="2.5"
-          fill="none" stroke="#111" strokeWidth="0.5" />
-        {/* Panel title with separator line */}
-        <text x="12" y="14" fill="#555" fontSize="5.5" fontFamily="monospace"
+        {/* ═══════════════════════════════════════════════════════ */}
+        {/*  WARNANZEIGEN — Chernobyl-style packed tile panel       */}
+        {/* ═══════════════════════════════════════════════════════ */}
+        {/* Panel background */}
+        <rect x="2" y="2" width={W - 4} height={WARN_H} rx="2"
+          fill="#060606" stroke="#1c1c1c" strokeWidth="1" />
+        <rect x="3" y="3" width={W - 6} height={WARN_H - 2} rx="1.5"
+          fill="none" stroke="#0f0f0f" strokeWidth="0.5" />
+
+        {/* Panel title */}
+        <text x="10" y="13" fill="#555" fontSize="7" fontFamily="monospace"
           letterSpacing="1.5" fontWeight="bold">
           WARNANZEIGEN
         </text>
-        <line x1="78" y1="10" x2={W - 12} y2="10"
-          stroke="#1a1a1a" strokeWidth="0.5" />
+        {/* Row category markers */}
+        <text x={tx(0)} y={TY0 - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">RLST</text>
+        <text x={tx(0)} y={TY0 + TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">THRM</text>
+        <text x={tx(0)} y={TY0 + 2 * TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">DMPF</text>
+        <text x={tx(0)} y={TY0 + 3 * TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">SYS</text>
 
-        {/* Row 1: Power & Temperature warnings */}
-        <WarningLight cx={55}  cy={30} label="ÜBERLTG"
-          active={warnOverpower} color={critOverpower ? '#ff2020' : '#ffd700'} blink={warnOverpower} />
-        <WarningLight cx={120} cy={30} label="KM-TEMP"
-          active={warnCoolantTemp} color={critCoolantTemp ? '#ff2020' : '#ffd700'} blink={warnCoolantTemp} />
-        <WarningLight cx={185} cy={30} label="BE-TEMP"
-          active={warnFuelTemp} color={critFuelTemp ? '#ff2020' : '#ffd700'} blink={warnFuelTemp} />
-        <WarningLight cx={250} cy={30} label="DRUCK"
-          active={warnPressure} color={critPressure ? '#ff2020' : '#ffd700'} blink={warnPressure} />
-        <WarningLight cx={315} cy={30} label="DAMPF%"
-          active={warnVoid} color="#ffd700" blink={warnVoid} />
-        {/* Row 1 continued: Safety warnings */}
-        <WarningLight cx={380} cy={30} label="OZR▼"
-          active={warnOZR} color={critOZR ? '#ff2020' : '#ffd700'} blink={warnOZR} />
-        <WarningLight cx={445} cy={30} label="MCP▼"
-          active={warnFlowLow} color="#ffd700" blink={warnFlowLow} />
-        <WarningLight cx={510} cy={30} label="TRM-NIV"
-          active={warnDrumLow || warnDrumHigh} color="#ffd700" blink={warnDrumLow || warnDrumHigh} />
-        <WarningLight cx={575} cy={30} label="ECCS"
-          active={!eccsEnabled} color="#ff2020" blink={!eccsEnabled} />
+        {/* Render all 44 tiles */}
+        {tiles.map((tile, i) => {
+          const col = i % 11;
+          const row = Math.floor(i / 11);
+          return (
+            <WarningTile
+              key={i}
+              x={tx(col)} y={ty(row)}
+              w={TW} h={TH}
+              label={tile.label}
+              active={tile.active}
+              color={tile.color}
+              blink={tile.blink}
+            />
+          );
+        })}
 
-        {/* Panel bottom edge highlight */}
-        <line x1="4" y1={WARN_H + 1} x2={W - 4} y2={WARN_H + 1}
+        {/* Panel bottom border */}
+        <line x1="3" y1={WARN_H + 2} x2={W - 3} y2={WARN_H + 2}
           stroke="#1a1a1a" strokeWidth="0.5" />
 
         {/* ============== */}
@@ -399,7 +453,7 @@ export default function SynopticDiagram({
           fontSize="6" fontFamily="monospace" fontWeight="bold">TROMMEL</text>
         <text x={DRUM.x} y={DRUM.y - 16} textAnchor="middle" fill="#4488aa"
           fontSize="6" fontFamily="monospace" fontWeight="bold">ABSCHEIDER</text>
-        {/* Water level fill with wave animation */}
+        {/* Water level fill */}
         {(() => {
           const rx = DRUM.x - DRUM.w / 2 + 5;
           const fullH = DRUM.h - 10;
@@ -408,10 +462,8 @@ export default function SynopticDiagram({
           const waveY = topY + fullH - fillH;
           return (
             <>
-              <rect x={rx} y={waveY}
-                width={DRUM.w - 10} height={fillH}
+              <rect x={rx} y={waveY} width={DRUM.w - 10} height={fillH}
                 fill="rgba(34,136,204,0.14)" rx="6" />
-              {/* Wave surface line */}
               <line x1={rx + 2} y1={waveY} x2={rx + DRUM.w - 12} y2={waveY}
                 stroke="rgba(34,136,204,0.35)" strokeWidth="1">
                 <animate attributeName="y1" values={`${waveY};${waveY - 1};${waveY}`} dur="2s" repeatCount="indefinite" />
@@ -427,15 +479,11 @@ export default function SynopticDiagram({
           const markY = topY + fullH * (1 - lvl / 100);
           return (
             <g key={lvl}>
-              <line
-                x1={DRUM.x - DRUM.w / 2 + 5} y1={markY}
+              <line x1={DRUM.x - DRUM.w / 2 + 5} y1={markY}
                 x2={DRUM.x + DRUM.w / 2 - 5} y2={markY}
-                stroke={lvl === 50 ? '#4488aa' : '#2a2a2a'} strokeWidth="0.4"
-                strokeDasharray="3 2" />
+                stroke={lvl === 50 ? '#4488aa' : '#2a2a2a'} strokeWidth="0.4" strokeDasharray="3 2" />
               <text x={DRUM.x + DRUM.w / 2 - 3} y={markY + 2}
-                textAnchor="start" fill="#333" fontSize="3.5" fontFamily="monospace">
-                {lvl}
-              </text>
+                textAnchor="start" fill="#333" fontSize="3.5" fontFamily="monospace">{lvl}</text>
             </g>
           );
         })}
@@ -457,22 +505,19 @@ export default function SynopticDiagram({
           const valveH = 22;
           return (
             <>
-              {/* Steam pipe from drum to valve */}
-              <path d={`M ${DRUM.x + DRUM.w / 2} ${steamY}
-                         L ${valveX - valveW / 2} ${steamY}`}
+              {/* Steam pipe drum → valve */}
+              <path d={`M ${DRUM.x + DRUM.w / 2} ${steamY} L ${valveX - valveW / 2} ${steamY}`}
                 fill="none" stroke={steamColor} strokeWidth="2.5"
                 strokeDasharray={turbineValveOpen > 0 ? '6 2' : '2 5'} />
-              {/* Pressure label */}
               <text x={(DRUM.x + DRUM.w / 2 + valveX) / 2} y={steamY - 7}
                 textAnchor="middle" fill="#888" fontSize="6" fontFamily="monospace">
                 {steamPressure.toFixed(1)} bar
               </text>
-              {/* === STEAM VALVE === */}
+              {/* Steam valve */}
               <rect x={valveX - valveW / 2} y={steamY - valveH / 2}
                 width={valveW} height={valveH} rx="3"
                 fill={turbineValveOpen > 0 ? `${steamColor}12` : '#0a0a0a'}
                 stroke={turbineValveOpen > 0 ? steamColor : '#444'} strokeWidth="1.2" />
-              {/* Bowtie valve symbol */}
               <polygon
                 points={`${valveX - 7},${steamY - 6} ${valveX + 2},${steamY} ${valveX - 7},${steamY + 6}`}
                 fill="none" stroke={turbineValveOpen > 0 ? steamColor : '#444'} strokeWidth="1" />
@@ -484,8 +529,7 @@ export default function SynopticDiagram({
                 fontSize="5" fontFamily="monospace" fontWeight="bold">
                 {turbineValveOpen > 0 ? `AUF ${turbineValveOpen}%` : 'GESCHL.'}
               </text>
-
-              {/* Valve → Turbine pipe */}
+              {/* Valve → turbine pipe */}
               <path d={`M ${valveX + valveW / 2} ${steamY}
                          L ${TURB.x - TURB.r - 4} ${steamY}
                          L ${TURB.x - TURB.r - 4} ${TURB.y}`}
@@ -496,25 +540,21 @@ export default function SynopticDiagram({
           );
         })()}
 
-        {/* ═══════════════════════════ */}
-        {/*  TURBINE — SPINNING BLADES */}
-        {/* ═══════════════════════════ */}
-        {/* Outer ring */}
+        {/* ══════════════════════════════ */}
+        {/*  TURBINE — SPINNING BLADES     */}
+        {/* ══════════════════════════════ */}
         <circle cx={TURB.x} cy={TURB.y} r={TURB.r}
           fill={turbineConnected ? 'rgba(68,170,68,0.05)' : 'rgba(170,68,68,0.05)'}
           stroke={turbineConnected ? '#44aa44' : '#aa4444'} strokeWidth="2.2" />
-        {/* Speed ring — rpm indicator ring */}
         <circle cx={TURB.x} cy={TURB.y} r={TURB.r - 3}
           fill="none" stroke={turbineConnected ? '#44aa44' : '#aa4444'}
           strokeWidth="0.5" opacity="0.3" />
-        {/* Rotating blade group */}
         <g>
           {turbineSpinDur > 0 && (
             <animateTransform attributeName="transform" type="rotate"
               from={`0 ${TURB.x} ${TURB.y}`} to={`360 ${TURB.x} ${TURB.y}`}
               dur={`${turbineSpinDur}s`} repeatCount="indefinite" />
           )}
-          {/* 8 turbine blades with tapered shape */}
           {[0, 45, 90, 135, 180, 225, 270, 315].map(angle => {
             const rad = (angle * Math.PI) / 180;
             const bc = turbineConnected ? (warnTurbineOver ? '#ffd700' : '#44aa44') : '#333';
@@ -534,7 +574,6 @@ export default function SynopticDiagram({
             );
           })}
         </g>
-        {/* Center hub */}
         <circle cx={TURB.x} cy={TURB.y} r="6"
           fill="#0e0e0e" stroke={turbineConnected ? '#44aa44' : '#444'} strokeWidth="1.5" />
         <circle cx={TURB.x} cy={TURB.y} r="2.5"
@@ -556,12 +595,10 @@ export default function SynopticDiagram({
           {turbineConnected ? '● VERBUNDEN' : '○ GETRENNT'}
         </text>
 
-        {/* ═══════════════════════ */}
-        {/*  GENERATOR + POWER OUT */}
-        {/* ═══════════════════════ */}
-        {/* Shaft from turbine to generator with rotation indicator */}
-        <line x1={TURB.x + TURB.r} y1={TURB.y}
-          x2={GEN.x - GEN.w / 2} y2={TURB.y}
+        {/* ══════════════════════════ */}
+        {/*  GENERATOR + POWER OUT     */}
+        {/* ══════════════════════════ */}
+        <line x1={TURB.x + TURB.r} y1={TURB.y} x2={GEN.x - GEN.w / 2} y2={TURB.y}
           stroke="#444" strokeWidth="3" />
         <rect x={GEN.x - GEN.w / 2} y={GEN.y - GEN.h / 2}
           width={GEN.w} height={GEN.h} rx="4"
@@ -571,11 +608,8 @@ export default function SynopticDiagram({
           fill="none" stroke="var(--amber)" strokeWidth="0.3" opacity="0.3" />
         <text x={GEN.x} y={GEN.y - 8} textAnchor="middle" fill="var(--amber)"
           fontSize="7" fontFamily="monospace" fontWeight="bold">GEN</text>
-        {/* Animated AC symbol */}
         <text x={GEN.x} y={GEN.y + 3} textAnchor="middle" fill="var(--amber)"
-          fontSize="12" fontFamily="monospace" fontWeight="bold">
-          ~
-        </text>
+          fontSize="12" fontFamily="monospace" fontWeight="bold">~</text>
         {generatorOutput > 5 && (
           <circle cx={GEN.x} cy={GEN.y} r="14" fill="none"
             stroke="var(--amber)" strokeWidth="0.4" opacity="0.3">
@@ -585,13 +619,10 @@ export default function SynopticDiagram({
         )}
         <text x={GEN.x} y={GEN.y + 14} textAnchor="middle" fill="var(--amber)"
           fontSize="7" fontFamily="monospace" fontWeight="bold">{generatorOutput.toFixed(0)} MWe</text>
-        {/* Power line out with pulsing */}
-        <line x1={GEN.x + GEN.w / 2} y1={GEN.y}
-          x2={GEN.x + GEN.w / 2 + 24} y2={GEN.y}
+        <line x1={GEN.x + GEN.w / 2} y1={GEN.y} x2={GEN.x + GEN.w / 2 + 24} y2={GEN.y}
           stroke={generatorOutput > 10 ? 'var(--warning-yellow)' : '#333'} strokeWidth="2.5" />
         {generatorOutput > 10 && (
-          <line x1={GEN.x + GEN.w / 2} y1={GEN.y}
-            x2={GEN.x + GEN.w / 2 + 24} y2={GEN.y}
+          <line x1={GEN.x + GEN.w / 2} y1={GEN.y} x2={GEN.x + GEN.w / 2 + 24} y2={GEN.y}
             stroke="var(--warning-yellow)" strokeWidth="1" opacity="0.4">
             <animate attributeName="opacity" values="0.6;0.1;0.6" dur="0.8s" repeatCount="indefinite" />
           </line>
@@ -606,8 +637,7 @@ export default function SynopticDiagram({
         {/* ======================================= */}
         {/*  EXHAUST → CONDENSER → FEEDWATER RETURN */}
         {/* ======================================= */}
-        <path d={`M ${TURB.x} ${TURB.y + TURB.r}
-                   L ${TURB.x} ${COND.y - COND.h / 2}`}
+        <path d={`M ${TURB.x} ${TURB.y + TURB.r} L ${TURB.x} ${COND.y - COND.h / 2}`}
           fill="none" stroke="#2288cc" strokeWidth="2" />
         <text x={TURB.x + 16} y={(TURB.y + TURB.r + COND.y - COND.h / 2) / 2}
           fill="#555" fontSize="4" fontFamily="monospace">ABDAMPF</text>
@@ -616,7 +646,6 @@ export default function SynopticDiagram({
         <rect x={COND.x - COND.w / 2} y={COND.y - COND.h / 2}
           width={COND.w} height={COND.h} rx="3"
           fill="rgba(34,136,204,0.05)" stroke="#4488aa" strokeWidth="1.2" />
-        {/* Internal condenser tubes */}
         {[0, 1, 2].map(i => (
           <line key={i}
             x1={COND.x - COND.w / 2 + 6} y1={COND.y - 6 + i * 6}
@@ -628,7 +657,7 @@ export default function SynopticDiagram({
         <text x={COND.x} y={COND.y + 7} textAnchor="middle" fill="#4488aa"
           fontSize="4" fontFamily="monospace">K-2</text>
 
-        {/* Condenser → bottom pipe → left → up to drum (feedwater return) */}
+        {/* Condenser → feedwater return */}
         <path d={`M ${COND.x} ${COND.y + COND.h / 2}
                    L ${COND.x} ${coldReturnY}
                    L ${DRUM.x} ${coldReturnY}
@@ -663,7 +692,7 @@ export default function SynopticDiagram({
           {coolantFlowRate.toFixed(0)} L/s
         </text>
 
-        {/* Pump indicators — with spinning animation for active pumps */}
+        {/* Pump indicators */}
         {pumpStates.map((active, i) => {
           const px = coldLeftX + 12 + i * 20;
           const py = coldReturnY - 14;
@@ -672,7 +701,6 @@ export default function SynopticDiagram({
               <rect x={px - 8} y={py - 7} width="16" height="14" rx="2"
                 fill={active ? 'rgba(0,255,65,0.06)' : 'rgba(255,32,32,0.06)'}
                 stroke={active ? '#00ff41' : '#ff2020'} strokeWidth="0.8" />
-              {/* Pump circle with rotation indicator */}
               <circle cx={px} cy={py} r="4"
                 fill="none" stroke={active ? '#00ff41' : '#ff2020'} strokeWidth="0.6" />
               {active ? (
