@@ -37,11 +37,17 @@ function pipeWidth(flowRate: number): number {
   return Math.max(2, Math.min(5, (flowRate / PHYSICS.COOLANT_FLOW_NOMINAL) * 3.5));
 }
 
-/* ─── Chernobyl-style rectangular warning tile — packed tight like the мнемосхема ─── */
+type WarningLabel = string | [string, string];
+
+/* ─── Dense annunciator tile used above the synoptic ─── */
 function WarningTile({ x, y, w, h, label, active, color, blink }: {
-  x: number; y: number; w: number; h: number; label: string;
+  x: number; y: number; w: number; h: number; label: WarningLabel;
   active: boolean; color: string; blink?: boolean;
 }) {
+  const lines = Array.isArray(label) ? label : [label];
+  const fontSize = lines.length > 1 ? 4.6 : 6.2;
+  const firstLineY = lines.length > 1 ? y + h / 2 - 1.8 : y + h / 2 + 2;
+
   return (
     <g>
       {active && blink && (
@@ -58,13 +64,17 @@ function WarningTile({ x, y, w, h, label, active, color, blink }: {
           fill={color} opacity="0.07" />
       )}
       {/* Label text */}
-      <text x={x + w / 2} y={y + h / 2 + 2}
+      <text x={x + w / 2} y={firstLineY}
         textAnchor="middle"
         fill={active ? color : '#1e1e1e'}
-        fontSize="6.5" fontFamily="monospace"
+        fontSize={fontSize} fontFamily="monospace"
         fontWeight={active ? 'bold' : 'normal'}
         letterSpacing="0.15">
-        {label}
+        {lines.map((line, index) => (
+          <tspan key={`${line}-${index}`} x={x + w / 2} dy={index === 0 ? 0 : 5.2}>
+            {line}
+          </tspan>
+        ))}
       </text>
     </g>
   );
@@ -128,19 +138,20 @@ export default function SynopticDiagram({
 
   // ── Layout constants ─────────────────────────────────────────
   const W = 620;
-  const H = 398;          // taller to accommodate larger warning panel
+  const H = 376;          // tighter: gap between warning panel and schema closed
   const WARN_H = 108;     // 4 rows × 20px + header 22px + padding
+  const SCHEMA_OFFSET_Y = -24;
 
-  // Component centres — all y-coords shifted +28 vs original
-  const CORE = { x: 90,  y: 233, w: 80,  h: 110 };
-  const DRUM = { x: 248, y: 218, w: 72,  h: 85  };
-  const TURB = { x: 420, y: 198, r: 34  };
-  const GEN  = { x: 530, y: 198, w: 50,  h: 42  };
-  const COND = { x: 420, y: 333, w: 50,  h: 28  };
-  const ECCS = { x: 22,  y: 203, w: 36,  h: 54  };
+  // Component centres — all y-coords shifted +8 vs original (was +28, reduced to close gap)
+  const CORE = { x: 90,  y: 213 + SCHEMA_OFFSET_Y, w: 80,  h: 110 };
+  const DRUM = { x: 248, y: 198 + SCHEMA_OFFSET_Y, w: 72,  h: 85  };
+  const TURB = { x: 420, y: 178 + SCHEMA_OFFSET_Y, r: 34  };
+  const GEN  = { x: 530, y: 178 + SCHEMA_OFFSET_Y, w: 50,  h: 42  };
+  const COND = { x: 420, y: 313 + SCHEMA_OFFSET_Y, w: 50,  h: 28  };
+  const ECCS = { x: 22,  y: 183 + SCHEMA_OFFSET_Y, w: 36,  h: 54  };
 
-  const hotY        = CORE.y - 22;       // 211
-  const coldReturnY = 368;
+  const hotY        = CORE.y - 22;       // 191
+  const coldReturnY = 348 + SCHEMA_OFFSET_Y;
   const coldLeftX   = CORE.x - CORE.w / 2 - 10;  // 40
 
   // ── Tile grid geometry ───────────────────────────────────────
@@ -158,56 +169,56 @@ export default function SynopticDiagram({
   // ── 44 warning tiles — 4 rows × 11 ──────────────────────────
   const tiles = [
     // Row 0 — Leistung & Reaktivität
-    { label: 'ÜBERTG-W',  active: warnOverpower,    color: '#ffd700', blink: true  },
-    { label: 'ÜBERTG-KR', active: critOverpower,    color: '#ff2020', blink: true  },
-    { label: 'OZR-WARN',  active: warnOZR,          color: '#ffd700', blink: false },
-    { label: 'OZR-KRIT',  active: critOZR,          color: '#ff2020', blink: true  },
-    { label: 'XE-VERGIF', active: warnXenon,        color: '#ff8800', blink: false },
-    { label: 'XE-KRIT',   active: critXenon,        color: '#ff2020', blink: true  },
-    { label: 'AZ-5 AKT',  active: az5Active,        color: '#ff2020', blink: true  },
-    { label: 'BAZ-BLKD',  active: !bazArmed,        color: '#ff5533', blink: false },
-    { label: 'ECCS-AUS',  active: !eccsEnabled,     color: '#ff2020', blink: true  },
-    { label: 'NOTKÜHL',   active: !eccsEnabled && (critOverpower || critCoolantTemp), color: '#ff2020', blink: true },
-    { label: 'NOTSTROM',  active: generatorOutput < 5 && turbineConnected, color: '#ff8800', blink: false },
+    { label: ['LEISTUNG', 'HOCH'],      active: warnOverpower,    color: '#ffd700', blink: true  },
+    { label: ['LEISTUNG', 'KRIT.'],     active: critOverpower,    color: '#ff2020', blink: true  },
+    { label: ['OZR', 'NIEDR.'],         active: warnOZR,          color: '#ffd700', blink: false },
+    { label: ['OZR', 'KRIT.'],          active: critOZR,          color: '#ff2020', blink: true  },
+    { label: ['XENON', 'HOCH'],         active: warnXenon,        color: '#ff8800', blink: false },
+    { label: ['XENON', 'KRIT.'],        active: critXenon,        color: '#ff2020', blink: true  },
+    { label: ['AZ-5', 'AKTIV'],         active: az5Active,        color: '#ff2020', blink: true  },
+    { label: ['BAZ', 'GESPERRT'],       active: !bazArmed,        color: '#ff5533', blink: false },
+    { label: ['ECCS', 'AUS'],           active: !eccsEnabled,     color: '#ff2020', blink: true  },
+    { label: ['NOTKÜHL.', 'ANF.'],      active: !eccsEnabled && (critOverpower || critCoolantTemp), color: '#ff2020', blink: true },
+    { label: ['EIGENBED.', 'FEHLT'],    active: generatorOutput < 5 && turbineConnected, color: '#ff8800', blink: false },
 
     // Row 1 — Thermik
-    { label: 'KM-TEMP↑',  active: warnCoolantTemp,  color: '#ffd700', blink: true  },
-    { label: 'KM-SIED',   active: critCoolantTemp,  color: '#ff2020', blink: true  },
-    { label: 'BE-TEMP↑',  active: warnFuelTemp,     color: '#ffd700', blink: warnFuelTemp },
-    { label: 'BE-KRIT',   active: critFuelTemp,     color: '#ff2020', blink: true  },
-    { label: 'VOID-W',    active: warnVoid,         color: '#ffd700', blink: false },
-    { label: 'VOID-KRIT', active: critVoid,         color: '#ff2020', blink: true  },
-    { label: 'KERN-HEIT', active: fuelTemperature > 1000, color: '#ff8800', blink: false },
-    { label: 'KAVITAT',   active: coolantTemperature > PHYSICS.COOLANT_TEMP_BOILING - PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD, color: '#ff8800', blink: false },
-    { label: 'KÜHL-ABF',  active: coolantFlowRate < PHYSICS.COOLANT_FLOW_NOMINAL * 0.7, color: '#ffd700', blink: false },
-    { label: 'DAMPF-VD',  active: steamVoidFraction > 0.15, color: '#ff8800', blink: false },
-    { label: 'T-DELTA↑',  active: fuelTemperature - coolantTemperature > 700, color: '#ff8800', blink: false },
+    { label: ['KÜHLMITT.', 'HEISS'],    active: warnCoolantTemp,  color: '#ffd700', blink: true  },
+    { label: ['KÜHLMITT.', 'SIEDET'],   active: critCoolantTemp,  color: '#ff2020', blink: true  },
+    { label: ['BRENNST.', 'HEISS'],     active: warnFuelTemp,     color: '#ffd700', blink: warnFuelTemp },
+    { label: ['BRENNST.', 'KRIT.'],     active: critFuelTemp,     color: '#ff2020', blink: true  },
+    { label: ['DAMPFANT.', 'HOCH'],     active: warnVoid,         color: '#ffd700', blink: false },
+    { label: ['DAMPFANT.', 'KRIT.'],    active: critVoid,         color: '#ff2020', blink: true  },
+    { label: ['KERN', 'HEISS'],         active: fuelTemperature > 1000, color: '#ff8800', blink: false },
+    { label: ['UNTERKÜHL.', 'NIEDR.'],  active: coolantTemperature > PHYSICS.COOLANT_TEMP_BOILING - PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD, color: '#ff8800', blink: false },
+    { label: ['WÄRMEABF.', 'NIEDR.'],   active: coolantFlowRate < PHYSICS.COOLANT_FLOW_NOMINAL * 0.7, color: '#ffd700', blink: false },
+    { label: ['VERDAMPF.', 'HOCH'],     active: steamVoidFraction > 0.15, color: '#ff8800', blink: false },
+    { label: ['DELTA T', 'HOCH'],       active: fuelTemperature - coolantTemperature > 700, color: '#ff8800', blink: false },
 
     // Row 2 — Dampf & Wasser
-    { label: 'DRUCK-W',   active: warnPressure,     color: '#ffd700', blink: false },
-    { label: 'DRUCK-KR',  active: critPressure,     color: '#ff2020', blink: true  },
-    { label: 'TROMM-LO',  active: warnDrumLow,      color: '#ffd700', blink: warnDrumLow },
-    { label: 'TROMM-HI',  active: warnDrumHigh,     color: '#ffd700', blink: warnDrumHigh },
-    { label: 'SPEISEW-W', active: feedWaterFlow < 200, color: '#ffd700', blink: false },
-    { label: 'SPEISEW-HI',active: feedWaterFlow > 800, color: '#ffd700', blink: false },
-    { label: 'DAMPF-LTG', active: steamPressure > 75, color: '#ff8800', blink: false },
-    { label: 'KM-FLUSS↓', active: warnFlowLow,      color: '#ffd700', blink: true  },
-    { label: 'UMLAUF',    active: activeCoolantPumps < 6, color: '#ffd700', blink: false },
-    { label: 'TRB-AUSL',  active: turbineValveOpen === 0 && turbineConnected && turbineSpeed > 100, color: '#888888', blink: false },
-    { label: 'LECK-SIG',  active: steamVoidFraction > 0.2 && fuelTemperature > 900, color: '#ff2020', blink: true  },
+    { label: ['DAMPFDR.', 'HOCH'],      active: warnPressure,     color: '#ffd700', blink: false },
+    { label: ['DAMPFDR.', 'KRIT.'],     active: critPressure,     color: '#ff2020', blink: true  },
+    { label: ['TROMMEL', 'NIEDR.'],     active: warnDrumLow,      color: '#ffd700', blink: warnDrumLow },
+    { label: ['TROMMEL', 'HOCH'],       active: warnDrumHigh,     color: '#ffd700', blink: warnDrumHigh },
+    { label: ['SPEISEW.', 'NIEDR.'],    active: feedWaterFlow < 200, color: '#ffd700', blink: false },
+    { label: ['SPEISEW.', 'HOCH'],      active: feedWaterFlow > 800, color: '#ffd700', blink: false },
+    { label: ['FRISCHD.', 'HOCH'],      active: steamPressure > 75, color: '#ff8800', blink: false },
+    { label: ['KÜHLFLUSS', 'NIEDR.'],   active: warnFlowLow,      color: '#ffd700', blink: true  },
+    { label: ['PUMPEN', '< 6'],         active: activeCoolantPumps < 6, color: '#ffd700', blink: false },
+    { label: ['TG-8', 'AUSLAUF'],       active: turbineValveOpen === 0 && turbineConnected && turbineSpeed > 100, color: '#cccccc', blink: false },
+    { label: ['LECK', 'VERDACHT'],      active: steamVoidFraction > 0.2 && fuelTemperature > 900, color: '#ff2020', blink: true  },
 
     // Row 3 — Pumpen & Systeme
-    { label: 'MCP-1',     active: !pumpStates[0],   color: '#ff2020', blink: !pumpStates[0] },
-    { label: 'MCP-2',     active: !pumpStates[1],   color: '#ff2020', blink: !pumpStates[1] },
-    { label: 'MCP-3',     active: !pumpStates[2],   color: '#ff2020', blink: !pumpStates[2] },
-    { label: 'MCP-4',     active: !pumpStates[3],   color: '#ff2020', blink: !pumpStates[3] },
-    { label: 'MCP-5',     active: !pumpStates[4],   color: '#ff2020', blink: !pumpStates[4] },
-    { label: 'MCP-6',     active: !pumpStates[5],   color: '#ff2020', blink: !pumpStates[5] },
-    { label: 'MCP-7',     active: !pumpStates[6],   color: '#ff2020', blink: !pumpStates[6] },
-    { label: 'MCP-8',     active: !pumpStates[7],   color: '#ff2020', blink: !pumpStates[7] },
-    { label: 'TURB-DRZ',  active: warnTurbineOver,  color: '#ffd700', blink: true  },
-    { label: 'GEN-AUS',   active: generatorOutput < 10 && turbineConnected, color: '#ff5533', blink: false },
-    { label: 'NETZ-V',    active: generatorOutput < 5, color: '#ff2020', blink: false },
+    { label: 'HKP-1',     active: !pumpStates[0],   color: '#ff2020', blink: !pumpStates[0] },
+    { label: 'HKP-2',     active: !pumpStates[1],   color: '#ff2020', blink: !pumpStates[1] },
+    { label: 'HKP-3',     active: !pumpStates[2],   color: '#ff2020', blink: !pumpStates[2] },
+    { label: 'HKP-4',     active: !pumpStates[3],   color: '#ff2020', blink: !pumpStates[3] },
+    { label: 'HKP-5',     active: !pumpStates[4],   color: '#ff2020', blink: !pumpStates[4] },
+    { label: 'HKP-6',     active: !pumpStates[5],   color: '#ff2020', blink: !pumpStates[5] },
+    { label: 'HKP-7',     active: !pumpStates[6],   color: '#ff2020', blink: !pumpStates[6] },
+    { label: 'HKP-8',     active: !pumpStates[7],   color: '#ff2020', blink: !pumpStates[7] },
+    { label: ['TG-8', 'ÜBERDREH'],      active: warnTurbineOver,  color: '#ffd700', blink: true  },
+    { label: ['GENERATOR', 'AUSFALL'],  active: generatorOutput < 10 && turbineConnected, color: '#ff5533', blink: false },
+    { label: ['NETZSPG.', 'AUS'],       active: generatorOutput < 5, color: '#ff2020', blink: false },
   ];
 
   return (
@@ -289,10 +300,10 @@ export default function SynopticDiagram({
           WARNANZEIGEN
         </text>
         {/* Row category markers */}
-        <text x={tx(0)} y={TY0 - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">RLST</text>
-        <text x={tx(0)} y={TY0 + TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">THRM</text>
-        <text x={tx(0)} y={TY0 + 2 * TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">DMPF</text>
-        <text x={tx(0)} y={TY0 + 3 * TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">SYS</text>
+        <text x={tx(0)} y={TY0 - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">REAKT</text>
+        <text x={tx(0)} y={TY0 + TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">THERM</text>
+        <text x={tx(0)} y={TY0 + 2 * TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">WASSER</text>
+        <text x={tx(0)} y={TY0 + 3 * TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">SYSTEM</text>
 
         {/* Render all 44 tiles */}
         {tiles.map((tile, i) => {
@@ -680,11 +691,11 @@ export default function SynopticDiagram({
                    L ${CORE.x - CORE.w / 2} ${CORE.y + CORE.h / 2 - 10}`}
           fill="none" stroke="#2288cc" strokeWidth={pw}
           markerEnd="url(#arrowCold)" />
-        {/* MCP label + pump count */}
+        {/* HKP label + pump count */}
         <text x={(coldLeftX + DRUM.x - DRUM.w / 2 - 18) / 2 + 10} y={coldReturnY - 36}
           textAnchor="middle" fill={warnFlowLow ? '#ffd700' : '#777'}
           fontSize="6" fontFamily="monospace" fontWeight="bold">
-          MCP {activeCoolantPumps}/8
+          HKP {activeCoolantPumps}/8
         </text>
         <text x={(coldLeftX + DRUM.x - DRUM.w / 2 - 18) / 2 + 10} y={coldReturnY - 28}
           textAnchor="middle" fill={warnFlowLow ? '#ffd700' : '#666'}
@@ -725,7 +736,7 @@ export default function SynopticDiagram({
               <text x={px} y={py + 11} textAnchor="middle"
                 fill={active ? '#00ff41' : '#ff2020'}
                 fontSize="3.5" fontFamily="monospace" fontWeight="bold">
-                ГЦН-{i + 1}
+                HKP-{i + 1}
               </text>
             </g>
           );

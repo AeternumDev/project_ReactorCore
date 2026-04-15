@@ -237,7 +237,7 @@ export default function SelsynPanel({
     <div style={{
       border: '1px solid var(--border)',
       padding: '8px',
-      background: '#0a0f0a',
+      background: 'var(--surface)',
       flex: 1,
       minWidth: 0,
       overflow: 'auto',

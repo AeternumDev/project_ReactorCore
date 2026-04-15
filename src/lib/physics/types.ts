@@ -6,17 +6,21 @@ export interface ReactorState {
   coolantFlowRate: number;
 
   // Stabgruppen (detaillierte Steuerung)
-  manualRods: number;       // MR — Manuelle Regelstäbe (0-30)
+  manualRods: number;       // MR/RR — Handregelstäbe (0-143)
   autoRods: number;         // AR — Automatische Regelstäbe (0-12)
-  shortenedRods: number;    // USP — Verkürzte Absorberstäbe (0-24)
-  safetyRods: number;       // AZ — Sicherheitsstäbe (0-145)
+  shortenedRods: number;    // USP — Verkürzte Absorberstäbe (0-32)
+  safetyRods: number;       // AZ — Sicherheitsstäbe (0-24)
 
   // Physikalische Zustandsgrößen (berechnet)
   thermalPower: number;
   neutronFlux: number;
+  delayedNeutronPrecursors: [number, number, number, number, number, number];
+  iodineConcentration: number;
   xenonConcentration: number;
   coolantTemperature: number;
   fuelTemperature: number;
+  fuelSurfaceTemperature: number;
+  claddingTemperature: number;
   steamPressure: number;
   steamVoidFraction: number;
   coreTemperatureZones: [number, number, number, number];
@@ -59,6 +63,8 @@ export interface ReactorState {
   az5Active: boolean;
   az5Timer: number;
   az5PrePower: number;
+  az5PreMargin: number;       // OZR-Stababsenkung zum Zeitpunkt der AZ-5-Auslösung
+  az5PreVoid: number;         // Dampfblasenanteil zum Zeitpunkt der AZ-5-Auslösung
   pumpStates: [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean];
 }
 

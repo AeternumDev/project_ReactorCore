@@ -152,17 +152,6 @@ export default function ReactorCockpit() {
         }}>
           <CoolantPumpPanel pumpStates={state.pumpStates} dispatch={dispatch} />
 
-          <TurbinePanel
-            turbineConnected={state.turbineConnected}
-            turbineValveOpen={state.turbineValveOpen}
-            turbineSpeed={state.turbineSpeed}
-            generatorOutput={state.generatorOutput}
-            steamPressure={state.steamPressure}
-            feedWaterFlow={state.feedWaterFlow}
-            drumSeparatorLevel={state.drumSeparatorLevel}
-            dispatch={dispatch}
-          />
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <EccsPanel eccsEnabled={state.eccsEnabled} dispatch={dispatch} />
             <BAZPanel
@@ -173,6 +162,19 @@ export default function ReactorCockpit() {
           </div>
 
           <AZ5Button az5Active={state.az5Active} dispatch={dispatch} />
+
+          <div style={{ marginTop: 'auto' }}>
+            <TurbinePanel
+              turbineConnected={state.turbineConnected}
+              turbineValveOpen={state.turbineValveOpen}
+              turbineSpeed={state.turbineSpeed}
+              generatorOutput={state.generatorOutput}
+              steamPressure={state.steamPressure}
+              feedWaterFlow={state.feedWaterFlow}
+              drumSeparatorLevel={state.drumSeparatorLevel}
+              dispatch={dispatch}
+            />
+          </div>
         </div>
 
         {/* CENTER COLUMN: Core Map + Synoptic + Controls/Log */}
@@ -265,6 +267,11 @@ export default function ReactorCockpit() {
               elapsedSeconds={state.elapsedSeconds}
               testCompleted={state.testCompleted}
               isExploded={state.isExploded}
+              steamPressure={state.steamPressure}
+              coolantFlowRate={state.coolantFlowRate}
+              drumSeparatorLevel={state.drumSeparatorLevel}
+              feedWaterFlow={state.feedWaterFlow}
+              reactivityMargin={state.reactivityMargin}
             />
           </div>
         </div>

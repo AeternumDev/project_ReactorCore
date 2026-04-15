@@ -141,7 +141,7 @@ describe("Physik-Engine", () => {
     const accidentCore = createTestState({
       thermalPower: 200,
       neutronFlux: 0.06,
-      xenonConcentration: 0,
+      xenonConcentration: 0.85,
       steamVoidFraction: 0.35,
       coolantTemperature: PHYSICS.COOLANT_TEMP_BOILING + 12,
       manualRods: 2,
@@ -158,6 +158,60 @@ describe("Physik-Engine", () => {
     expect(healthyAfterAz5.neutronFlux!).toBeLessThan(healthyCore.neutronFlux);
     expect(accidentAfterAz5.neutronFlux!).toBeGreaterThan(accidentCore.neutronFlux);
     expect(accidentDelta).toBeGreaterThan(Math.abs(healthyDelta) * 10);
+  });
+
+  test("AZ-5 nutzt die globale Einfahrrate statt jede Stabgruppe separat zu vervierfachen", () => {
+    const state = createTestState({
+      thermalPower: 200,
+      neutronFlux: 200 / PHYSICS.MAX_THERMAL_POWER,
+      manualRods: 2,
+      autoRods: 1,
+      shortenedRods: 1,
+      safetyRods: 4,
+    });
+
+    const next = calculateNextState({ ...state, ...triggerAZ5(state) });
+
+    expect(next.controlRods).toBe(14);
+    expect(next.reactivityMargin).toBe(14);
+  });
+
+  test("Vorhandene Siedekanäle kollabieren bei Xenon-Stall nicht in einem Tick", () => {
+    const state = createTestState({
+      thermalPower: 20,
+      neutronFlux: 20 / PHYSICS.MAX_THERMAL_POWER,
+      xenonConcentration: 1,
+      coolantTemperature: 298,
+      steamVoidFraction: 0.35,
+      manualRods: 2,
+      autoRods: 1,
+      shortenedRods: 1,
+      safetyRods: 4,
+    });
+
+    const next = calculateNextState({ ...state, ...triggerAZ5(state) });
+
+    expect(next.coolantTemperature!).toBeGreaterThan(PHYSICS.COOLANT_TEMP_BOILING);
+    expect(next.steamVoidFraction!).toBeGreaterThan(0.25);
+  });
+
+  test("Schwere Xenon-Vergiftung unterdrückt den AZ-5-Leistungssprung bei niedrigem OZR nicht", () => {
+    const state = createTestState({
+      thermalPower: 20,
+      neutronFlux: 20 / PHYSICS.MAX_THERMAL_POWER,
+      xenonConcentration: 1,
+      coolantTemperature: 298,
+      steamVoidFraction: 0.35,
+      manualRods: 2,
+      autoRods: 1,
+      shortenedRods: 1,
+      safetyRods: 4,
+    });
+
+    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, 2);
+
+    expect(afterScram.thermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
+    expect(afterScram.neutronFlux).toBeGreaterThan(0.6);
   });
 
   test("fuelTemperature >= 2800°C setzt isExploded = true", () => {
@@ -374,5 +428,77 @@ describe("Game Reducer", () => {
     expect(started.elapsedSeconds).toBe(0);
     expect(started.controlRods).toBe(INITIAL_STATE.controlRods);
     expect(started.xenonConcentration).toBe(INITIAL_STATE.xenonConcentration);
+  });
+
+  test("Live-Szenario kann OZR bis in den Unfallbereich absenken", () => {
+    let state = { ...INITIAL_STATE };
+
+    state = gameReducer(state, { type: "SET_MANUAL_RODS", payload: 0 });
+    state = gameReducer(state, { type: "SET_AUTO_RODS", payload: 0 });
+    state = gameReducer(state, { type: "SET_SHORTENED_RODS", payload: 0 });
+
+    expect(state.controlRods).toBeLessThan(PHYSICS.OZR_MINIMUM_SAFE);
+    expect(state.reactivityMargin).toBeLessThan(PHYSICS.OZR_MINIMUM_SAFE);
+  });
+
+  test("Unmittelbares AZ-5 nach Stab-Ausfahrt speichert den aktuellen OZR statt des letzten Tick-Werts", () => {
+    let state = {
+      ...INITIAL_STATE,
+      isRunning: true,
+      thermalPower: 20,
+      neutronFlux: 20 / PHYSICS.MAX_THERMAL_POWER,
+      xenonConcentration: 1,
+      coolantTemperature: 298,
+      steamVoidFraction: 0.35,
+      fuelTemperature: 700,
+    };
+
+    state = gameReducer(state, { type: "SET_MANUAL_RODS", payload: 0 });
+    state = gameReducer(state, { type: "SET_AUTO_RODS", payload: 0 });
+    state = gameReducer(state, { type: "SET_SHORTENED_RODS", payload: 0 });
+
+    const az5State = gameReducer(state, { type: "TRIGGER_AZ5" });
+
+    expect(az5State.az5PreMargin).toBe(az5State.controlRods);
+    expect(az5State.az5PreMargin).toBeLessThan(PHYSICS.OZR_MINIMUM_SAFE);
+  });
+
+  test("AZ-5 bei 100% Xenon und OZR < 15 führt zur Kernschmelze / Dampfexplosion", () => {
+    const state = createTestState({
+      thermalPower: 20,
+      neutronFlux: 20 / PHYSICS.MAX_THERMAL_POWER,
+      xenonConcentration: 1,
+      coolantTemperature: 298,
+      steamVoidFraction: 0.35,
+      fuelTemperature: 700,
+      manualRods: 0,
+      autoRods: 0,
+      shortenedRods: 0,
+      safetyRods: 8,
+    });
+
+    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, 10);
+
+    expect(afterScram.isExploded).toBe(true);
+  });
+
+  test("AZ-5 bei OZR > 30 und moderater Xenon-Vergiftung fährt sicher herunter", () => {
+    const state = createTestState({
+      thermalPower: 400,
+      neutronFlux: 400 / PHYSICS.MAX_THERMAL_POWER,
+      xenonConcentration: 0.7,
+      coolantTemperature: 278,
+      steamVoidFraction: 0.1,
+      fuelTemperature: 800,
+      manualRods: 30,
+      autoRods: 6,
+      shortenedRods: 6,
+      safetyRods: 8,
+    });
+
+    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, 20);
+
+    expect(afterScram.isExploded).toBe(false);
+    expect(afterScram.thermalPower).toBeLessThan(state.thermalPower);
   });
 });

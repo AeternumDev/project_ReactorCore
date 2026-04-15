@@ -26,8 +26,8 @@ export default function CoolantPumpPanel({ pumpStates, dispatch }: CoolantPumpPa
           paddingBottom: '4px',
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center' }}>KÜHLMITTELPUMPEN — {pumpStates.filter(Boolean).length}/8 AKTIV
-          <InfoTooltip text={`Hauptumwälzpumpen (MCP) treiben das Kühlmittel durch den Reaktorkern.
+        <span style={{ display: 'flex', alignItems: 'center' }}>HAUPTKREISPUMPEN — {pumpStates.filter(Boolean).length}/8 AKTIV
+          <InfoTooltip text={`Hauptkreispumpen (HKP) treiben das Kühlmittel durch den Reaktorkern.
 
 8 Pumpen verfügbar — je mehr aktiv, desto höher der Kühlmittelfluss.
 Höherer Fluss = bessere Kühlung, aber auch weniger Dampfblasen.
@@ -78,7 +78,7 @@ Klicken Sie auf eine Pumpe, um sie ein-/auszuschalten.`} />
                 color: 'var(--amber)',
               }}
             >
-              MCP-{i + 1}
+              HKP-{i + 1}
             </span>
             <span
               style={{

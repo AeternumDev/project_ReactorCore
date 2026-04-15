@@ -179,7 +179,7 @@ export default function MnemonicBoard({
     <div style={{
       border: '1px solid var(--border)',
       padding: '6px',
-      background: '#060b06',
+      background: 'var(--surface)',
       flex: 1,
       minWidth: 0,
       overflow: 'hidden',

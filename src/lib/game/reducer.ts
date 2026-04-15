@@ -1,7 +1,14 @@
 import { ReactorState, GameAction } from "@/lib/physics/types";
-import { calculateNextState, triggerAZ5, triggerBAZ } from "@/lib/physics/engine";
+import {
+  calculateNextState,
+  createEquilibriumDelayedNeutronPrecursors,
+  triggerAZ5,
+  triggerBAZ,
+} from "@/lib/physics/engine";
 import { PHYSICS } from "@/lib/physics/constants";
 import { calculateScore } from "./scoring";
+
+const INITIAL_NEUTRON_FLUX = 1500 / PHYSICS.MAX_THERMAL_POWER;
 
 export const INITIAL_STATE: ReactorState = {
   controlRods: 145,
@@ -9,19 +16,24 @@ export const INITIAL_STATE: ReactorState = {
   eccsEnabled: false,
   coolantFlowRate: 8 * PHYSICS.COOLANT_FLOW_PER_PUMP,
 
-  // Stabgruppen — Reaktor im kontrollierten Abstieg von 3200 MW, aktuell ~1500 MW
-  manualRods: 10,
+  // Stabgruppen — 145 eingefahrene Stabäquivalente, aber mit realistisch kleinem AZ-Anteil.
+  // So bleibt der Startzustand stabil, waehrend der Spieler den OZR spaeter in den Unfallbereich ziehen kann.
+  manualRods: 111,
   autoRods: 6,
   shortenedRods: 20,
-  safetyRods: 109,
+  safetyRods: 8,
 
   thermalPower: 1500,
-  neutronFlux: 1500 / PHYSICS.MAX_THERMAL_POWER,
+  neutronFlux: INITIAL_NEUTRON_FLUX,
+  delayedNeutronPrecursors: createEquilibriumDelayedNeutronPrecursors(INITIAL_NEUTRON_FLUX),
+  iodineConcentration: 0.35,
   xenonConcentration: 0.05,  // niedrig — Xenon bei hoher Leistung abgebrannt
   coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
   // Equilibrium fuel temp at 1500MW with 8 pumps:
   // 270 + (2800-270) * (1500/3200) / 1.0 ≈ 1455°C
   fuelTemperature: 950,
+  fuelSurfaceTemperature: 780,
+  claddingTemperature: 310,
   steamPressure: PHYSICS.STEAM_PRESSURE_NOMINAL,
   steamVoidFraction: 0,
   coreTemperatureZones: [
@@ -45,7 +57,7 @@ export const INITIAL_STATE: ReactorState = {
   powerMode: 'manual',
   powerSetpoint: 700,
 
-  // OZR — mit 145 Stäben eingefahren, gesund
+  // OZR — anfangs gesund, aber nicht durch ein unrealistisch grosses AZ-Bucket blockiert
   reactivityMargin: 145,
 
   // BAZ (historisch: war deaktiviert/blockiert durch Bediener)
@@ -66,6 +78,8 @@ export const INITIAL_STATE: ReactorState = {
   az5Active: false,
   az5Timer: 0,
   az5PrePower: 0,
+  az5PreMargin: 0,
+  az5PreVoid: 0,
   pumpStates: [true, true, true, true, true, true, true, true],
 };
 
@@ -87,6 +101,7 @@ export function gameReducer(state: ReactorState, action: GameAction): ReactorSta
       return {
         ...state,
         controlRods: Math.max(0, Math.min(PHYSICS.MAX_CONTROL_RODS, action.payload)),
+        reactivityMargin: Math.max(0, Math.min(PHYSICS.MAX_CONTROL_RODS, action.payload)),
       };
 
     case 'SET_MANUAL_RODS': {
@@ -96,6 +111,7 @@ export function gameReducer(state: ReactorState, action: GameAction): ReactorSta
         ...state,
         manualRods: mr,
         controlRods: Math.min(PHYSICS.MAX_CONTROL_RODS, total),
+        reactivityMargin: Math.min(PHYSICS.MAX_CONTROL_RODS, total),
       };
     }
 
@@ -106,6 +122,7 @@ export function gameReducer(state: ReactorState, action: GameAction): ReactorSta
         ...state,
         autoRods: ar,
         controlRods: Math.min(PHYSICS.MAX_CONTROL_RODS, total),
+        reactivityMargin: Math.min(PHYSICS.MAX_CONTROL_RODS, total),
       };
     }
 
@@ -116,6 +133,7 @@ export function gameReducer(state: ReactorState, action: GameAction): ReactorSta
         ...state,
         shortenedRods: usp,
         controlRods: Math.min(PHYSICS.MAX_CONTROL_RODS, total),
+        reactivityMargin: Math.min(PHYSICS.MAX_CONTROL_RODS, total),
       };
     }
 
