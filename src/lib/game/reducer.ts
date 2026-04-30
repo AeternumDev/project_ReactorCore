@@ -8,7 +8,7 @@ import {
 import { PHYSICS } from "@/lib/physics/constants";
 import { calculateScore } from "./scoring";
 
-const INITIAL_NEUTRON_FLUX = 1500 / PHYSICS.MAX_THERMAL_POWER;
+const INITIAL_NEUTRON_FLUX = 1500 / PHYSICS.NOMINAL_POWER;
 
 export const INITIAL_STATE: ReactorState = {
   controlRods: 145,
@@ -81,6 +81,8 @@ export const INITIAL_STATE: ReactorState = {
   az5PreMargin: 0,
   az5PreVoid: 0,
   pumpStates: [true, true, true, true, true, true, true, true],
+  pumpSpeeds: [1, 1, 1, 1, 1, 1, 1, 1],
+  rundownBusActive: true,
 };
 
 export function gameReducer(state: ReactorState, action: GameAction): ReactorState {
@@ -142,14 +144,16 @@ export function gameReducer(state: ReactorState, action: GameAction): ReactorSta
       if (pumpIndex < 0 || pumpIndex > 7) return state;
       const newPumpStates = [...state.pumpStates] as ReactorState['pumpStates'];
       newPumpStates[pumpIndex] = !newPumpStates[pumpIndex];
-      const activePumps = newPumpStates.filter(Boolean).length;
+      // activeCoolantPumps und coolantFlowRate werden jetzt von der Pumpendynamik
+      // im Engine-Tick geführt (Auslauf/Anlauf mit Schwungrad-Trägheit).
       return {
         ...state,
         pumpStates: newPumpStates,
-        activeCoolantPumps: activePumps,
-        coolantFlowRate: activePumps * PHYSICS.COOLANT_FLOW_PER_PUMP,
       };
     }
+
+    case 'TOGGLE_RUNDOWN_BUS':
+      return { ...state, rundownBusActive: !state.rundownBusActive };
 
     case 'TOGGLE_ECCS':
       return { ...state, eccsEnabled: !state.eccsEnabled };

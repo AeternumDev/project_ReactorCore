@@ -402,7 +402,7 @@ export default function SelsynPanel({
           <span>INSTRUMENTIERUNG</span>
           <span style={{ color: '#555', fontSize: '0.6rem' }}>ANALOG</span>
         </div>
-        <svg viewBox="0 0 420 264" width="100%" style={{ display: 'block' }}>
+        <svg viewBox="0 0 420 264" width="100%" style={{ display: 'block', maxWidth: '560px', margin: '0 auto' }} preserveAspectRatio="xMidYMid meet">
           {gauges.map((gauge) => (
             <GaugeDial
               key={gauge.id}

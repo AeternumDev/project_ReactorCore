@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { PHYSICS } from '@/lib/physics/constants';
 
 export interface TestChecklistPanelProps {
@@ -234,18 +234,13 @@ export default function TestChecklistPanel(props: TestChecklistPanelProps) {
     progressState.completedStepIds,
   );
 
-  const activeStep = checklist.find((item) => item.status === 'active')?.id ?? null;
-  const completedCount = checklist.filter((item) => item.status === 'completed').length;
-
-  // Auto-scroll to active step
-  useEffect(() => {
-    if (activeStep && scrollRef.current) {
-      const el = scrollRef.current.querySelector(`[data-step="${activeStep}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }
-  }, [activeStep]);
+  const activeStep = checklist.find((item) => item.status === 'active') ?? null;
+  const completedSteps = checklist.filter((item) => item.status === 'completed');
+  const pendingSteps = checklist.filter((item) => item.status === 'pending');
+  const completedCount = completedSteps.length;
+  const totalSteps = checklist.length;
+  const progressPercent = (completedCount / totalSteps) * 100;
+  const allDone = completedCount === totalSteps;
 
   return (
     <div
@@ -321,6 +316,141 @@ export default function TestChecklistPanel(props: TestChecklistPanelProps) {
         </div>
       </div>
 
+      {/* Progress bar */}
+      <div
+        style={{
+          fontFamily: 'var(--font-share-tech-mono), monospace',
+          marginBottom: '8px',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: '0.68rem',
+            color: '#666',
+            marginBottom: '3px',
+          }}
+        >
+          <span>FORTSCHRITT</span>
+          <span style={{ color: allDone ? 'var(--safe-green)' : 'var(--amber)' }}>
+            {completedCount} / {totalSteps}
+          </span>
+        </div>
+        <div
+          style={{
+            height: '6px',
+            background: '#0a0a0a',
+            border: '1px solid #1a1a1a',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: `${progressPercent}%`,
+              background: allDone
+                ? 'linear-gradient(90deg, var(--safe-green), #5fbf6f)'
+                : 'linear-gradient(90deg, var(--amber), #d49500)',
+              transition: 'width 0.4s ease',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* HERO: current step / completion banner */}
+      {allDone ? (
+        <div
+          data-testid="checklist-complete-banner"
+          style={{
+            border: '1px solid var(--safe-green)',
+            background: 'rgba(95, 191, 111, 0.06)',
+            padding: '12px',
+            marginBottom: '10px',
+            fontFamily: 'var(--font-share-tech-mono), monospace',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '0.7rem',
+              color: 'var(--safe-green)',
+              letterSpacing: '0.1em',
+              marginBottom: '4px',
+            }}
+          >
+            ✓ ALLE SCHRITTE ABGESCHLOSSEN
+          </div>
+          <div style={{ fontSize: '0.88rem', color: '#cfeacd' }}>
+            Programm vollständig abgearbeitet — Reaktor weiter beherrschen.
+          </div>
+        </div>
+      ) : activeStep ? (
+        <div
+          data-testid="checklist-active-step"
+          data-step={activeStep.id}
+          style={{
+            border: '2px solid var(--warning-yellow)',
+            background: 'rgba(255, 200, 0, 0.05)',
+            padding: '10px 12px',
+            marginBottom: '10px',
+            fontFamily: 'var(--font-share-tech-mono), monospace',
+            boxShadow: '0 0 0 1px rgba(255, 200, 0, 0.15) inset',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '6px',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '0.68rem',
+                color: 'var(--warning-yellow)',
+                letterSpacing: '0.12em',
+              }}
+            >
+              ► JETZT TUN · SCHRITT {activeStep.step} VON {totalSteps}
+            </span>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                color: '#666',
+              }}
+            >
+              {completedCount} ERLEDIGT
+            </span>
+          </div>
+          <div
+            style={{
+              color: 'var(--text)',
+              fontSize: '0.95rem',
+              fontWeight: 'bold',
+              marginBottom: '6px',
+              letterSpacing: '0.02em',
+            }}
+          >
+            {activeStep.title}
+          </div>
+          <div
+            style={{
+              color: '#bdbdbd',
+              fontSize: '0.8rem',
+              lineHeight: 1.5,
+            }}
+          >
+            {activeStep.instruction}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Step list — completed (collapsed) + pending (compact) */}
       <div
         ref={scrollRef}
         style={{
@@ -328,100 +458,131 @@ export default function TestChecklistPanel(props: TestChecklistPanelProps) {
           minHeight: 0,
           overflowY: 'auto',
           fontFamily: 'var(--font-share-tech-mono), monospace',
-          fontSize: '0.86rem',
-          lineHeight: '1.55',
+          fontSize: '0.78rem',
           paddingRight: '2px',
         }}
       >
-        {checklist.map((item) => {
-          const completed = item.status === 'completed';
-          const isActive = item.status === 'active';
-
-          return (
+        {completedSteps.length > 0 && (
+          <div style={{ marginBottom: '8px' }}>
             <div
-              key={item.id}
-              data-step={item.id}
               style={{
-                padding: '8px 10px',
-                marginBottom: '6px',
-                border: `1px solid ${
-                  completed ? 'var(--safe-green)' :
-                  isActive ? 'var(--warning-yellow)' :
-                  'var(--border)'
-                }`,
-                background: isActive ? 'rgba(255, 200, 0, 0.03)' : 'transparent',
-                opacity: completed ? 0.72 : 1,
+                fontSize: '0.62rem',
+                color: '#555',
+                letterSpacing: '0.1em',
+                padding: '0 2px 4px',
+                borderBottom: '1px solid #1a1a1a',
+                marginBottom: '4px',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '4px' }}>
+              ABGESCHLOSSEN ({completedSteps.length})
+            </div>
+            {completedSteps.map((item) => (
+              <div
+                key={item.id}
+                data-step={item.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '3px 4px',
+                  color: '#6a8a6a',
+                  fontSize: '0.74rem',
+                  lineHeight: 1.3,
+                }}
+              >
                 <span
                   style={{
-                    width: '24px',
-                    height: '24px',
-                    display: 'flex',
+                    width: '16px',
+                    height: '16px',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: `1px solid ${completed ? 'var(--safe-green)' : '#444'}`,
-                    color: completed ? 'var(--safe-green)' : '#444',
-                    fontSize: '0.78rem',
+                    border: '1px solid var(--safe-green)',
+                    color: 'var(--safe-green)',
+                    fontSize: '0.7rem',
                     flexShrink: 0,
                   }}
                 >
-                  {completed ? '✓' : item.step}
+                  ✓
                 </span>
-                <div style={{ minWidth: 0 }}>
-                  <div
-                    style={{
-                      color: completed ? 'var(--safe-green)' :
-                        isActive ? 'var(--warning-yellow)' :
-                        '#888',
-                      fontSize: '0.72rem',
-                      letterSpacing: '0.06em',
-                      marginBottom: '2px',
-                    }}
-                  >
-                    SCHRITT {item.step} · {completed ? 'ABGESCHLOSSEN' : isActive ? 'AKTIV' : 'AUSSTEHEND'}
-                  </div>
-                  <div
-                    style={{
-                      color: completed ? '#8fbe8f' : isActive ? 'var(--text)' : '#b0b0b0',
-                      fontSize: '0.88rem',
-                      fontWeight: 'bold',
-                      textDecoration: completed ? 'line-through' : 'none',
-                    }}
-                  >
-                    {item.title}
-                  </div>
-                </div>
+                <span style={{ color: '#5a7a5a', minWidth: '20px' }}>{item.step}</span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.title}
+                </span>
               </div>
+            ))}
+          </div>
+        )}
+
+        {pendingSteps.length > 0 && (
+          <div>
+            <div
+              style={{
+                fontSize: '0.62rem',
+                color: '#555',
+                letterSpacing: '0.1em',
+                padding: '0 2px 4px',
+                borderBottom: '1px solid #1a1a1a',
+                marginBottom: '4px',
+              }}
+            >
+              AUSSTEHEND ({pendingSteps.length})
+            </div>
+            {pendingSteps.map((item) => (
               <div
+                key={item.id}
+                data-step={item.id}
                 style={{
-                  color: completed ? '#555' :
-                    isActive ? 'var(--text)' :
-                    '#666',
-                  paddingLeft: '34px',
-                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '3px 4px',
+                  color: '#777',
+                  fontSize: '0.74rem',
+                  lineHeight: 1.3,
                 }}
               >
-                {item.instruction}
+                <span
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid #333',
+                    color: '#555',
+                    fontSize: '0.7rem',
+                    flexShrink: 0,
+                  }}
+                >
+                  {item.step}
+                </span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.title}
+                </span>
               </div>
-            </div>
-          );
-        })}
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Footer status */}
       <div
         style={{
           fontFamily: 'var(--font-share-tech-mono), monospace',
-          fontSize: '0.78rem',
+          fontSize: '0.72rem',
           color: '#555',
           borderTop: '1px solid var(--border)',
           paddingTop: '6px',
           marginTop: '8px',
+          display: 'flex',
+          justifyContent: 'space-between',
         }}
       >
-        {completedCount}/{CHECKLIST.length} SCHRITTE IN REIHENFOLGE ABGESCHLOSSEN
+        <span>{completedCount}/{totalSteps} SCHRITTE</span>
+        <span style={{ color: allDone ? 'var(--safe-green)' : '#666' }}>
+          {allDone ? 'PROGRAMM KOMPLETT' : activeStep ? `► ${activeStep.step} AKTIV` : '— WARTEN —'}
+        </span>
       </div>
     </div>
   );

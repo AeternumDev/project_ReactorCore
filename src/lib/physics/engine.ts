@@ -48,6 +48,12 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
   const events: GameEvent[] = [...state.events];
   const elapsed = state.elapsedSeconds + DT;
 
+  // 1) Pumpendynamik (ГЦН‑317 Schwungrad-Auslauf / Anlauf, Reservebus an TG-8).
+  //    activeCoolantPumps und coolantFlowRate werden hieraus geführt, damit die Physik
+  //    den tätlichen Auslauf vom 26.04.1986 (~45 s Reserve) nachbilden kann.
+  const pumpUpdate = updatePumpDynamics(state);
+  const liveActivePumps = pumpUpdate.activeCoolantPumps;
+
   let manualRods = state.manualRods;
   let autoRods = state.autoRods;
   let shortenedRods = state.shortenedRods;
@@ -59,10 +65,10 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     autoRods = Math.max(0, Math.min(PHYSICS.AUTO_RODS_MAX, autoRods + adjustment));
   }
 
-  const controlRods = Math.round(manualRods + autoRods + shortenedRods + safetyRods);
+  const controlRods = manualRods + autoRods + shortenedRods + safetyRods;
   const reactivityMargin = controlRods;
 
-  const core = integrateCoreDynamics(state, {
+  const core = integrateCoreDynamics({ ...state, activeCoolantPumps: liveActivePumps }, {
     controlRods,
     reactivityMargin,
   });
@@ -73,9 +79,9 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     PHYSICS.DECAY_HEAT_FLOOR,
     PHYSICS.PEAK_EXCURSION_POWER
   );
-  const coolantFlowRate = state.activeCoolantPumps * PHYSICS.COOLANT_FLOW_PER_PUMP;
+  const coolantFlowRate = pumpUpdate.coolantFlowRate;
   const effectiveCooling = calculateEffectiveCooling(
-    state.activeCoolantPumps,
+    liveActivePumps,
     state.eccsEnabled,
     core.coolantTemperature
   );
@@ -129,7 +135,13 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
       coolantFlowRate < PHYSICS.BAZ_COOLANT_FLOW_MIN
     ) {
       bazTriggered = true;
-      addEventIfNew(events, elapsed, "BAZ AUSGELÖST — SCHNELLE NOTABSCHALTUNG", "critical");
+      addEventIfNew(
+        events,
+        elapsed,
+        `BAZ AUSGELÖST — Wärmeleistung ${Math.round(thermalPower)} MW, Druck ${steamPressure.toFixed(1)} MPa, Durchfluss ${Math.round(coolantFlowRate)} m³/h`,
+        "critical",
+        "baz-triggered",
+      );
     }
   }
 
@@ -170,12 +182,24 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
 
   if (core.fuelTemperature >= PHYSICS.FUEL_TEMP_MELTDOWN) {
     isExploded = true;
-    addEventIfNew(events, elapsed, "KERNSCHMELZE — REAKTOR 4 EXPLODIERT", "alarm");
+    addEventIfNew(
+      events,
+      elapsed,
+      `KERNSCHMELZE — Brennstofftemperatur ${Math.round(core.fuelTemperature)} °C, Reaktor 4 zerstört`,
+      "alarm",
+      "meltdown",
+    );
   }
 
   if (steamPressure >= PHYSICS.STEAM_PRESSURE_CRITICAL) {
     isExploded = true;
-    addEventIfNew(events, elapsed, "DRUCKROHRVERSAGEN — DAMPFEXPLOSION", "alarm");
+    addEventIfNew(
+      events,
+      elapsed,
+      `DRUCKROHRVERSAGEN — Dampfdruck ${steamPressure.toFixed(1)} MPa, Dampfexplosion`,
+      "alarm",
+      "pressure-explosion",
+    );
   }
 
   if (elapsed >= PHYSICS.TEST_DURATION_SECONDS && !isExploded) {
@@ -183,55 +207,123 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
   }
 
   const subcoolingMargin = PHYSICS.COOLANT_TEMP_BOILING - core.coolantTemperature;
-  if (subcoolingMargin < PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD && state.activeCoolantPumps >= 6) {
+  // Kavitation hängt von NPSH ab — nicht von der Pumpenanzahl. Trigger sobald
+  // überhaupt nennenswerter Durchfluss vorhanden ist und die Unterkühlung schwindet.
+  if (subcoolingMargin < PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD && liveActivePumps >= 1) {
     const cavitationSeverity = clamp01(
       1 - subcoolingMargin / PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD
     );
     if (cavitationSeverity > 0.5) {
-      addEventIfNew(events, elapsed, "KAVITATION IN KÜHLMITTELPUMPEN", "warning");
+      addEventIfNew(
+        events,
+        elapsed,
+        `KAVITATION IN KÜHLMITTELPUMPEN — Unterkühlung nur ${subcoolingMargin.toFixed(1)} °C`,
+        "warning",
+        "cavitation",
+      );
     }
   }
 
   const finalControlRods = Math.round(manualRods + autoRods + shortenedRods + newSafetyRods);
 
   if (finalControlRods < PHYSICS.MINIMUM_SAFE_RODS) {
-    addEventIfNew(events, elapsed, "MINIMALE STABABSENKUNG UNTERSCHRITTEN", "alarm");
+    addEventIfNew(
+      events,
+      elapsed,
+      `MINIMALE STABABSENKUNG UNTERSCHRITTEN — nur ${finalControlRods} Stäbe gegenüber ${PHYSICS.MINIMUM_SAFE_RODS} erforderlich`,
+      "alarm",
+      "min-rods",
+    );
   }
 
   if (core.fuelTemperature > PHYSICS.FUEL_TEMP_WARNING) {
-    addEventIfNew(events, elapsed, "BRENNSTOFFTEMPERATUR KRITISCH", "critical");
+    addEventIfNew(
+      events,
+      elapsed,
+      `BRENNSTOFFTEMPERATUR KRITISCH — ${Math.round(core.fuelTemperature)} °C (Grenzwert ${PHYSICS.FUEL_TEMP_WARNING} °C)`,
+      "critical",
+      "fuel-temp",
+    );
   }
 
   if (core.xenonConcentration > 0.5 && state.xenonConcentration <= 0.5) {
-    addEventIfNew(events, elapsed, "XENON-VERGIFTUNG ERHÖHT", "warning");
+    addEventIfNew(
+      events,
+      elapsed,
+      `XENON-VERGIFTUNG ERHÖHT — Konzentration ${(core.xenonConcentration * 100).toFixed(0)} %, Reaktivitätsreserve sinkt`,
+      "warning",
+      "xenon",
+    );
   }
 
   if (steamPressure > PHYSICS.STEAM_PRESSURE_WARNING && state.steamPressure <= PHYSICS.STEAM_PRESSURE_WARNING) {
-    addEventIfNew(events, elapsed, "DAMPFDRUCK ERHÖHT", "warning");
+    addEventIfNew(
+      events,
+      elapsed,
+      `DAMPFDRUCK ERHÖHT — ${steamPressure.toFixed(1)} MPa (Warngrenze ${PHYSICS.STEAM_PRESSURE_WARNING} MPa)`,
+      "warning",
+      "steam-pressure",
+    );
   }
 
   if (core.steamVoidFraction > 0.3 && state.steamVoidFraction <= 0.3) {
-    addEventIfNew(events, elapsed, "DAMPFBLASENANTEIL KRITISCH", "warning");
+    addEventIfNew(
+      events,
+      elapsed,
+      `DAMPFBLASENANTEIL KRITISCH — ${(core.steamVoidFraction * 100).toFixed(0)} % Hohlraumanteil`,
+      "warning",
+      "void",
+    );
   }
 
   if (finalControlRods < PHYSICS.OZR_WARNING) {
-    addEventIfNew(events, elapsed, "OZR UNTER WARNGRENZE", "warning");
+    addEventIfNew(
+      events,
+      elapsed,
+      `OZR UNTER WARNGRENZE — ${finalControlRods} Stäbe (Warngrenze ${PHYSICS.OZR_WARNING})`,
+      "warning",
+      "ozr-warning",
+    );
   }
 
   if (finalControlRods < PHYSICS.OZR_MINIMUM_SAFE) {
-    addEventIfNew(events, elapsed, "OZR KRITISCH NIEDRIG", "alarm");
+    addEventIfNew(
+      events,
+      elapsed,
+      `OZR KRITISCH NIEDRIG — ${finalControlRods} Stäbe, Vorschrift verlangt sofortige Abschaltung`,
+      "alarm",
+      "ozr-critical",
+    );
   }
 
   if (drumSeparatorLevel < PHYSICS.DRUM_LEVEL_LOW) {
-    addEventIfNew(events, elapsed, "TROMMELABSCHEIDER WASSERSTAND NIEDRIG", "warning");
+    addEventIfNew(
+      events,
+      elapsed,
+      `TROMMELABSCHEIDER WASSERSTAND NIEDRIG — ${drumSeparatorLevel.toFixed(0)} % (Grenzwert ${PHYSICS.DRUM_LEVEL_LOW} %)`,
+      "warning",
+      "drum-level",
+    );
   }
 
   if (turbineSpeed > PHYSICS.TURBINE_MAX_SPEED * 0.95) {
-    addEventIfNew(events, elapsed, "TURBINE ÜBERDREHZAHL", "critical");
+    addEventIfNew(
+      events,
+      elapsed,
+      `TURBINE ÜBERDREHZAHL — ${Math.round(turbineSpeed)} U/min (Grenzwert ${Math.round(PHYSICS.TURBINE_MAX_SPEED)} U/min)`,
+      "critical",
+      "turbine-overspeed",
+    );
   }
 
   if (!bazArmed) {
-    addEventIfNew(events, elapsed, "BAZ DEAKTIVIERT — SCHUTZABSCHALTUNG BLOCKIERT", "warning");
+    addEventIfNew(
+      events,
+      elapsed,
+      `BAZ DEAKTIVIERT — Schutzabschaltung blockiert, Wärmeleistung ${Math.round(thermalPower)} MW`,
+      "warning",
+      "baz-disabled",
+    );
   }
 
   return {
@@ -266,6 +358,8 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     drumSeparatorLevel,
     bazTriggered,
     bazArmed,
+    activeCoolantPumps: liveActivePumps,
+    pumpSpeeds: pumpUpdate.pumpSpeeds,
   };
 }
 
@@ -280,8 +374,9 @@ export function triggerAZ5(state: ReactorState): Partial<ReactorState> {
   );
   events.push({
     timestamp: state.elapsedSeconds,
-    message: "AZ-5 AKTIVIERT — NOTABSCHALTUNG EINGELEITET",
+    message: `AZ-5 AKTIVIERT — Notabschaltung eingeleitet, Wärmeleistung ${Math.round(state.thermalPower)} MW, OZR ${currentControlRods} Stäbe`,
     severity: 'critical',
+    code: 'az5-activated',
   });
 
   // Stäbe werden NICHT sofort eingefahren — graduelle Einfahrt über 18 Sekunden (0,4 m/s)
@@ -303,8 +398,9 @@ export function triggerBAZ(state: ReactorState): Partial<ReactorState> {
   const events = [...state.events];
   events.push({
     timestamp: state.elapsedSeconds,
-    message: "BAZ MANUELL AUSGELÖST — SICHERHEITSSTÄBE EINFAHREN",
+    message: `BAZ MANUELL AUSGELÖST — Sicherheitsstäbe fahren ein, Wärmeleistung ${Math.round(state.thermalPower)} MW`,
     severity: 'critical',
+    code: 'baz-manual',
   });
 
   return {
@@ -367,6 +463,64 @@ function clamp01(value: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Aktualisiert die Drehzahl jeder ГЦН unter Berücksichtigung des Schwungrads,
+ * der Befühlung (pumpStates) und des Reservebus (rundownBusActive).
+ *
+ * • Pumpen am Reservebus folgen bei abgeschaltetem Bus der auslaufenden TG-8-Drehzahl.
+ * • Auslauf nach Stromverlust: exponentiell mit τ = PUMP_COASTDOWN_TAU (~22 s).
+ * • Anlauf nach Wiedereinschaltung: τ = PUMP_SPINUP_TAU.
+ * • Wenn pumpSpeeds und activeCoolantPumps stark voneinander abweichen (z. B. Test
+ *   setzt activeCoolantPumps direkt), werden die Drehzahlen einmalig synchronisiert.
+ */
+function updatePumpDynamics(state: ReactorState): {
+  pumpSpeeds: ReactorState['pumpSpeeds'];
+  activeCoolantPumps: number;
+  coolantFlowRate: number;
+} {
+  const rawSpeeds = state.pumpSpeeds ?? [1, 1, 1, 1, 1, 1, 1, 1];
+  const currentSum = rawSpeeds.reduce((s, v) => s + v, 0);
+  const overrideMismatch = Math.abs(currentSum - state.activeCoolantPumps) > 0.5;
+  const baseSpeeds: number[] = overrideMismatch
+    ? syncSpeedsToCount(state.activeCoolantPumps, state.pumpStates)
+    : [...rawSpeeds];
+
+  const turbineFraction = clamp01(state.turbineSpeed / PHYSICS.TURBINE_NOMINAL_SPEED);
+  const onRundownBus = new Set<number>(PHYSICS.PUMP_RUNDOWN_BUS_INDICES);
+
+  const nextSpeeds = baseSpeeds.map((current, i) => {
+    const commandedOn = state.pumpStates[i];
+    let target: number;
+    if (onRundownBus.has(i) && !state.rundownBusActive) {
+      // Vom Netz getrennt: Pumpe läuft mit der auslaufenden Turbine mit.
+      target = commandedOn ? turbineFraction : 0;
+    } else {
+      target = commandedOn ? 1 : 0;
+    }
+    const tau = target > current ? PHYSICS.PUMP_SPINUP_TAU : PHYSICS.PUMP_COASTDOWN_TAU;
+    const next = current + (target - current) * (DT / tau);
+    return clamp01(next);
+  }) as unknown as ReactorState['pumpSpeeds'];
+
+  const activeCoolantPumps = nextSpeeds.reduce((s, v) => s + v, 0);
+  const coolantFlowRate = activeCoolantPumps * PHYSICS.COOLANT_FLOW_PER_PUMP;
+  return { pumpSpeeds: nextSpeeds, activeCoolantPumps, coolantFlowRate };
+}
+
+function syncSpeedsToCount(
+  activeCount: number,
+  pumpStates: ReactorState['pumpStates']
+): number[] {
+  // Verteile activeCount auf die als ON markierten Pumpen; Rest 0.
+  const onIndices: number[] = [];
+  pumpStates.forEach((on, i) => { if (on) onIndices.push(i); });
+  const result = [0, 0, 0, 0, 0, 0, 0, 0];
+  if (onIndices.length === 0) return result;
+  const perPump = clamp01(activeCount / onIndices.length);
+  onIndices.forEach((i) => { result[i] = perPump; });
+  return result;
 }
 
 function distributeAz5Insertion(
@@ -446,6 +600,7 @@ function integrateCoreDynamics(state: ReactorState, control: CoreControlState): 
       coolantTarget,
       saturationTemperature,
       powerMW,
+      effectiveCooling,
       state.az5Active && state.az5Timer > 0 ? state.az5PreVoid : core.steamVoidFraction
     );
     const thermalTargets = calculateThermalTargets(powerMW, effectiveCooling, core.coolantTemperature);
@@ -586,7 +741,7 @@ function calculateEffectiveCooling(
     (activeCoolantPumps * PHYSICS.COOLANT_FLOW_PER_PUMP) / PHYSICS.COOLANT_FLOW_NOMINAL;
   const subcoolingMargin = PHYSICS.COOLANT_TEMP_BOILING - coolantTemperature;
 
-  if (subcoolingMargin < PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD && activeCoolantPumps >= 6) {
+  if (subcoolingMargin < PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD && activeCoolantPumps >= 1) {
     const cavitationSeverity = clamp01(
       1 - subcoolingMargin / PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD
     );
@@ -599,13 +754,14 @@ function calculateEffectiveCooling(
     coolingCapacity *= 1.3;
   }
 
-  return Math.max(0.01, coolingCapacity);
+  return Math.max(PHYSICS.EFFECTIVE_COOLING_FLOOR, coolingCapacity);
 }
 
 function calculateVoidTarget(
   coolantTarget: number,
   saturationTemperature: number,
   powerMW: number,
+  effectiveCooling: number,
   priorVoid: number
 ): number {
   const equilibriumVoid =
@@ -617,7 +773,19 @@ function calculateVoidTarget(
       ? clamp01((powerMW - PHYSICS.NOMINAL_POWER) / (PHYSICS.PEAK_EXCURSION_POWER - PHYSICS.NOMINAL_POWER))
       : 0;
 
-  return Math.max(equilibriumVoid, promptBoiling * 0.85, priorVoid * 0.35);
+  // Reduzierter Kühlmitteldurchfluss erzeugt unmittelbar Kanal-Austritts-Sieden,
+  // unabhängig von der Bulk-Mitteltemperatur. Das schließt die Lücke zwischen
+  // gemittelter Kühlmitteltemperatur und realer Zwei-Phasen-Strömung im RBMK-Kanal
+  // und stellt sicher, dass ein Pumpenausfall die positive Void-Rückkopplung anregt.
+  const coolingDeficit = clamp01(1 - effectiveCooling);
+  const flowInducedVoid = clamp01(
+    (powerMW / PHYSICS.NOMINAL_POWER) * coolingDeficit * PHYSICS.FLOW_INDUCED_VOID_GAIN
+  );
+
+  // Void inertia is handled by VOID_TIME_CONSTANT in the integration step;
+  // do not introduce an additional implicit floor here.
+  void priorVoid;
+  return Math.max(equilibriumVoid, promptBoiling * 0.85, flowInducedVoid);
 }
 
 function calculateSteamPressure(
@@ -673,12 +841,30 @@ function normalizeDelayedNeutronPrecursors(
   return createEquilibriumDelayedNeutronPrecursors(neutronFlux);
 }
 
-function hasRecentEvent(events: GameEvent[], message: string): boolean {
-  return events.some(e => e.message === message);
+const EVENT_REPEAT_WINDOW_SECONDS = 90;
+
+function hasRecentEvent(events: GameEvent[], code: string, now: number): boolean {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const event = events[i];
+    if (now - event.timestamp > EVENT_REPEAT_WINDOW_SECONDS) {
+      return false;
+    }
+    if ((event.code ?? event.message) === code) {
+      return true;
+    }
+  }
+  return false;
 }
 
-function addEventIfNew(events: GameEvent[], timestamp: number, message: string, severity: GameEvent['severity']): void {
-  if (!hasRecentEvent(events, message)) {
-    events.push({ timestamp, message, severity });
+function addEventIfNew(
+  events: GameEvent[],
+  timestamp: number,
+  message: string,
+  severity: GameEvent['severity'],
+  code?: string,
+): void {
+  const dedupKey = code ?? message;
+  if (!hasRecentEvent(events, dedupKey, timestamp)) {
+    events.push({ timestamp, message, severity, code: dedupKey });
   }
 }

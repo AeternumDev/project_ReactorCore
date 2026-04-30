@@ -66,12 +66,30 @@ export interface ReactorState {
   az5PreMargin: number;       // OZR-Stababsenkung zum Zeitpunkt der AZ-5-Auslösung
   az5PreVoid: number;         // Dampfblasenanteil zum Zeitpunkt der AZ-5-Auslösung
   pumpStates: [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean];
+  /**
+   * Tatsächliche Drehzahl jeder ГЦН als Anteil (0..1) der Nenndrehzahl.
+   * Folgt `pumpStates` mit Trägheit (Anlauf ~PUMP_SPINUP_TAU, Auslauf ~PUMP_COASTDOWN_TAU).
+   * Bildet das Schwungrad der ГЦН‑317 ab — die Grundlage des Auslauftests.
+   */
+  pumpSpeeds: [number, number, number, number, number, number, number, number];
+  /**
+   * Reservebus-Schalter. Wenn false, werden die Pumpen in PUMP_RUNDOWN_BUS_INDICES
+   * vom Netz getrennt und vom auslaufenden TG-8 versorgt — sie folgen dann dessen
+   * Drehzahl statt der vollen Nenndrehzahl. Initial true (Netzbetrieb).
+   */
+  rundownBusActive: boolean;
 }
 
 export interface GameEvent {
   timestamp: number;
   message: string;
   severity: 'info' | 'warning' | 'critical' | 'alarm';
+  /**
+   * Stable identifier used to deduplicate level-triggered events
+   * (e.g. "rods-low") even when the human-readable message includes
+   * dynamic readings such as the current rod count.
+   */
+  code?: string;
 }
 
 export type GameAction =
@@ -81,6 +99,7 @@ export type GameAction =
   | { type: 'SET_AUTO_RODS'; payload: number }
   | { type: 'SET_SHORTENED_RODS'; payload: number }
   | { type: 'TOGGLE_PUMP'; payload: number }
+  | { type: 'TOGGLE_RUNDOWN_BUS' }
   | { type: 'TOGGLE_ECCS' }
   | { type: 'SET_COOLANT_FLOW'; payload: number }
   | { type: 'TRIGGER_AZ5' }

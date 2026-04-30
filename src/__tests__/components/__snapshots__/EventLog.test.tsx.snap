@@ -13,7 +13,7 @@ exports[`EventLog renders empty state 1`] = `
        EINTRÄGE
     </div>
     <div
-      style="flex: 1 1 0%; overflow-y: auto; font-family: var(--font-share-tech-mono), monospace; font-size: 0.8rem; line-height: 1.6;"
+      style="flex: 1 1 0%; overflow-y: auto; font-family: var(--font-share-tech-mono), monospace; font-size: 0.8rem; line-height: 1.5;"
     >
       <div
         style="color: rgb(68, 68, 68);"
@@ -38,42 +38,86 @@ exports[`EventLog renders events in correct order (newest first) 1`] = `
        EINTRÄGE
     </div>
     <div
-      style="flex: 1 1 0%; overflow-y: auto; font-family: var(--font-share-tech-mono), monospace; font-size: 0.8rem; line-height: 1.6;"
+      style="flex: 1 1 0%; overflow-y: auto; font-family: var(--font-share-tech-mono), monospace; font-size: 0.8rem; line-height: 1.5;"
     >
       <div
-        class="animate-pulse-alarm"
-        style="color: var(--alarm-red); font-weight: bold;"
+        class="event-row event-row-in animate-pulse-alarm"
+        style="color: var(--alarm-red); font-weight: bold; padding: 3px 4px; border-left: 2px solid currentcolor; margin-bottom: 2px;"
       >
-        [
-        01:30
-        ] 
+        <span
+          style="opacity: 0.7;"
+        >
+          [
+          01:24:00
+          ]
+        </span>
+         
+        <span
+          style="opacity: 0.7;"
+        >
+          ALRM
+        </span>
+         
         KERNSCHMELZE — REAKTOR 4 EXPLODIERT
       </div>
       <div
-        class=""
-        style="color: var(--alarm-red);"
+        class="event-row event-row-in"
+        style="color: var(--alarm-red); padding: 3px 4px; border-left: 2px solid transparent; margin-bottom: 2px;"
       >
-        [
-        01:00
-        ] 
+        <span
+          style="opacity: 0.7;"
+        >
+          [
+          01:23:30
+          ]
+        </span>
+         
+        <span
+          style="opacity: 0.7;"
+        >
+          KRIT
+        </span>
+         
         BRENNSTOFFTEMPERATUR KRITISCH
       </div>
       <div
-        class=""
-        style="color: var(--warning-yellow);"
+        class="event-row event-row-in"
+        style="color: var(--warning-yellow); padding: 3px 4px; border-left: 2px solid transparent; margin-bottom: 2px;"
       >
-        [
-        00:30
-        ] 
+        <span
+          style="opacity: 0.7;"
+        >
+          [
+          01:23:00
+          ]
+        </span>
+         
+        <span
+          style="opacity: 0.7;"
+        >
+          WARN
+        </span>
+         
         XENON-VERGIFTUNG ERHÖHT
       </div>
       <div
-        class=""
-        style="color: rgb(102, 102, 102);"
+        class="event-row event-row-in"
+        style="color: rgb(136, 136, 136); padding: 3px 4px; border-left: 2px solid transparent; margin-bottom: 2px;"
       >
-        [
-        00:10
-        ] 
+        <span
+          style="opacity: 0.7;"
+        >
+          [
+          01:22:40
+          ]
+        </span>
+         
+        <span
+          style="opacity: 0.7;"
+        >
+          INFO
+        </span>
+         
         REAKTOR GESTARTET
       </div>
     </div>

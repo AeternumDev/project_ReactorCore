@@ -150,7 +150,12 @@ export default function ReactorCockpit() {
           flexDirection: 'column',
           gap: '4px',
         }}>
-          <CoolantPumpPanel pumpStates={state.pumpStates} dispatch={dispatch} />
+          <CoolantPumpPanel
+            pumpStates={state.pumpStates}
+            pumpSpeeds={state.pumpSpeeds}
+            rundownBusActive={state.rundownBusActive}
+            dispatch={dispatch}
+          />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <EccsPanel eccsEnabled={state.eccsEnabled} dispatch={dispatch} />
@@ -163,18 +168,22 @@ export default function ReactorCockpit() {
 
           <AZ5Button az5Active={state.az5Active} dispatch={dispatch} />
 
-          <div style={{ marginTop: 'auto' }}>
-            <TurbinePanel
-              turbineConnected={state.turbineConnected}
-              turbineValveOpen={state.turbineValveOpen}
-              turbineSpeed={state.turbineSpeed}
-              generatorOutput={state.generatorOutput}
-              steamPressure={state.steamPressure}
-              feedWaterFlow={state.feedWaterFlow}
-              drumSeparatorLevel={state.drumSeparatorLevel}
-              dispatch={dispatch}
-            />
-          </div>
+          <TestChecklistPanel
+            thermalPower={state.thermalPower}
+            eccsEnabled={state.eccsEnabled}
+            turbineConnected={state.turbineConnected}
+            turbineValveOpen={state.turbineValveOpen}
+            turbineSpeed={state.turbineSpeed}
+            bazArmed={state.bazArmed}
+            elapsedSeconds={state.elapsedSeconds}
+            testCompleted={state.testCompleted}
+            isExploded={state.isExploded}
+            steamPressure={state.steamPressure}
+            coolantFlowRate={state.coolantFlowRate}
+            drumSeparatorLevel={state.drumSeparatorLevel}
+            feedWaterFlow={state.feedWaterFlow}
+            reactivityMargin={state.reactivityMargin}
+          />
         </div>
 
         {/* CENTER COLUMN: Core Map + Synoptic + Controls/Log */}
@@ -184,6 +193,10 @@ export default function ReactorCockpit() {
           display: 'flex',
           flexDirection: 'column',
           gap: '4px',
+          width: '100%',
+          maxWidth: '1100px',
+          margin: '0 auto',
+          minWidth: 0,
         }}>
           <div style={{ display: 'flex', gap: '4px' }}>
             <SelsynPanel
@@ -241,8 +254,8 @@ export default function ReactorCockpit() {
             az5Active={state.az5Active}
           />
 
-          {/* ControlRods (left) + EventLog + Checklist (right) under synoptic */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px' }}>
+          {/* ControlRods (left) + EventLog (right) under synoptic */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
             <ControlRodPanel
               controlRods={state.controlRods}
               manualRods={state.manualRods}
@@ -257,22 +270,6 @@ export default function ReactorCockpit() {
               dispatch={dispatch}
             />
             <EventLog events={state.events} onAlarm={handleAlarm} />
-            <TestChecklistPanel
-              thermalPower={state.thermalPower}
-              eccsEnabled={state.eccsEnabled}
-              turbineConnected={state.turbineConnected}
-              turbineValveOpen={state.turbineValveOpen}
-              turbineSpeed={state.turbineSpeed}
-              bazArmed={state.bazArmed}
-              elapsedSeconds={state.elapsedSeconds}
-              testCompleted={state.testCompleted}
-              isExploded={state.isExploded}
-              steamPressure={state.steamPressure}
-              coolantFlowRate={state.coolantFlowRate}
-              drumSeparatorLevel={state.drumSeparatorLevel}
-              feedWaterFlow={state.feedWaterFlow}
-              reactivityMargin={state.reactivityMargin}
-            />
           </div>
         </div>
 
@@ -311,6 +308,17 @@ export default function ReactorCockpit() {
             shortenedRods={state.shortenedRods}
             safetyRods={state.safetyRods}
             xenonConcentration={state.xenonConcentration}
+            dispatch={dispatch}
+          />
+
+          <TurbinePanel
+            turbineConnected={state.turbineConnected}
+            turbineValveOpen={state.turbineValveOpen}
+            turbineSpeed={state.turbineSpeed}
+            generatorOutput={state.generatorOutput}
+            steamPressure={state.steamPressure}
+            feedWaterFlow={state.feedWaterFlow}
+            drumSeparatorLevel={state.drumSeparatorLevel}
             dispatch={dispatch}
           />
 

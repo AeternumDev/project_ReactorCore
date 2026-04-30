@@ -8,17 +8,38 @@ interface EventLogProps {
   onAlarm?: (hasAlarm: boolean) => void;
 }
 
+/**
+ * Scenario clock — the historical Chernobyl turbine rundown test began at
+ * roughly 01:23:04 on 26 April 1986. We anchor the simulation clock so that
+ * t=0 in the engine reads as a wall-clock time the operator would actually
+ * have written into the journal.
+ */
+const SCENARIO_START_HOUR = 1;
+const SCENARIO_START_MINUTE = 22;
+const SCENARIO_START_SECOND = 30;
+const SCENARIO_START_TOTAL_SECONDS =
+  SCENARIO_START_HOUR * 3600 + SCENARIO_START_MINUTE * 60 + SCENARIO_START_SECOND;
+
 function formatTimestamp(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  const total = Math.max(0, Math.floor(SCENARIO_START_TOTAL_SECONDS + seconds));
+  const h = Math.floor(total / 3600) % 24;
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 const severityStyles: Record<GameEvent['severity'], React.CSSProperties> = {
-  info: { color: '#666' },
+  info: { color: '#888' },
   warning: { color: 'var(--warning-yellow)' },
   critical: { color: 'var(--alarm-red)' },
   alarm: { color: 'var(--alarm-red)', fontWeight: 'bold' },
+};
+
+const severityLabel: Record<GameEvent['severity'], string> = {
+  info: 'INFO',
+  warning: 'WARN',
+  critical: 'KRIT',
+  alarm: 'ALRM',
 };
 
 export default function EventLog({ events, onAlarm }: EventLogProps) {
@@ -68,22 +89,40 @@ export default function EventLog({ events, onAlarm }: EventLogProps) {
           overflowY: 'auto',
           fontFamily: 'var(--font-share-tech-mono), monospace',
           fontSize: '0.8rem',
-          lineHeight: '1.6',
+          lineHeight: '1.5',
         }}
       >
         {reversed.length === 0 && (
           <div style={{ color: '#444' }}>Keine Ereignisse.</div>
         )}
-        {reversed.map((event, i) => (
-          <div
-            key={i}
-            style={severityStyles[event.severity]}
-            className={event.severity === 'alarm' ? 'animate-pulse-alarm' : ''}
-          >
-            [{formatTimestamp(event.timestamp)}] {event.message}
-          </div>
-        ))}
+        {reversed.map((event, i) => {
+          const isNewest = i === 0;
+          const baseClass = 'event-row event-row-in';
+          const className = event.severity === 'alarm'
+            ? `${baseClass} animate-pulse-alarm`
+            : baseClass;
+          // Stable key (original event index) so existing rows don't re-mount
+          // — and re-trigger the slide-in animation — when new events arrive.
+          const stableKey = `${events.length - 1 - i}-${event.timestamp.toFixed(2)}`;
+          return (
+            <div
+              key={stableKey}
+              className={className}
+              style={{
+                ...severityStyles[event.severity],
+                padding: '3px 4px',
+                borderLeft: `2px solid ${isNewest ? 'currentColor' : 'transparent'}`,
+                marginBottom: '2px',
+              }}
+            >
+              <span style={{ opacity: 0.7 }}>[{formatTimestamp(event.timestamp)}]</span>{' '}
+              <span style={{ opacity: 0.7 }}>{severityLabel[event.severity]}</span>{' '}
+              {event.message}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
+

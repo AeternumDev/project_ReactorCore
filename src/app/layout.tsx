@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
 import { Share_Tech_Mono, Rajdhani } from "next/font/google";
 import "./globals.css";
 
@@ -26,13 +25,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html
-        lang="de"
-        className={`${shareTechMono.variable} ${rajdhani.variable} h-full`}
-      >
-        <body className="min-h-full flex flex-col" style={{ fontFamily: 'var(--font-rajdhani), sans-serif' }}>{children}</body>
-      </html>
-    </ClerkProvider>
+    <html
+      lang="de"
+      className={`${shareTechMono.variable} ${rajdhani.variable} h-full`}
+    >
+      <body className="min-h-full flex flex-col" style={{ fontFamily: 'var(--font-rajdhani), sans-serif' }}>{children}</body>
+    </html>
   );
 }

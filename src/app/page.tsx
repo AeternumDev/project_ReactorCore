@@ -1,30 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { SignInButton, UserButton, useUser } from '@clerk/nextjs';
 
 export default function Home() {
   const router = useRouter();
-  const { isSignedIn } = useUser();
 
   return (
     <main
       className="relative flex flex-col items-center justify-center min-h-screen overflow-hidden"
       style={{ background: 'var(--bg)' }}
     >
-      {/* Auth button top-right */}
-      <div className="absolute top-4 right-6 z-10">
-        {isSignedIn ? (
-          <UserButton />
-        ) : (
-          <SignInButton mode="modal">
-            <button className="btn-industrial" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
-              ANMELDEN
-            </button>
-          </SignInButton>
-        )}
-      </div>
-
       {/* Reactor schematic background */}
       <div className="absolute inset-0 flex items-center justify-center opacity-15 pointer-events-none">
         <svg width="600" height="600" viewBox="0 0 600 600" fill="none">

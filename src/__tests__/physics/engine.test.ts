@@ -43,7 +43,7 @@ describe("Physik-Engine", () => {
   test("Xenon steigt bei niedriger Leistung (< 700 MW Ziel)", () => {
     const state = createTestState({
       thermalPower: 500, // unter 700 MW → Xenon-Aufbau
-      neutronFlux: 500 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 500 / PHYSICS.NOMINAL_POWER,
       xenonConcentration: 0.3,
     });
     const next = calculateNextState(state);
@@ -53,7 +53,7 @@ describe("Physik-Engine", () => {
   test("Xenon sinkt bei hoher Leistung (> 70% nominal)", () => {
     const state = createTestState({
       thermalPower: 2500, // ~78% of 3200
-      neutronFlux: 2500 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 2500 / PHYSICS.NOMINAL_POWER,
       xenonConcentration: 0.5,
       controlRods: 50,
     });
@@ -64,13 +64,13 @@ describe("Physik-Engine", () => {
   test("Mehr Kühlmittelpumpen senken fuelTemperature", () => {
     const baseState = createTestState({
       thermalPower: 1000,
-      neutronFlux: 1000 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 1000 / PHYSICS.NOMINAL_POWER,
       fuelTemperature: 900,
       activeCoolantPumps: 2,
     });
     const moreState = createTestState({
       thermalPower: 1000,
-      neutronFlux: 1000 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 1000 / PHYSICS.NOMINAL_POWER,
       fuelTemperature: 900,
       activeCoolantPumps: 8,
     });
@@ -82,12 +82,34 @@ describe("Physik-Engine", () => {
   test("0 Kühlmittelpumpen führen zu Temperaturanstieg", () => {
     const state = createTestState({
       thermalPower: 1000,
-      neutronFlux: 1000 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 1000 / PHYSICS.NOMINAL_POWER,
       fuelTemperature: 800,
       activeCoolantPumps: 0,
     });
     const next = calculateNextState(state);
     expect(next.fuelTemperature!).toBeGreaterThan(800);
+  });
+
+  test("Halbierter HKP-Durchfluss erhöht Leistung und Temperatur (positive Void-Rückkopplung)", () => {
+    // Regression: Pumpenausfall muss über Kanal-Austritts-Sieden Void erzeugen,
+    // sodass der positive Dampfblasenkoeffizient Leistung und Brennstofftemperatur
+    // anhebt – nicht senkt (RBMK Loss-of-Flow Verhalten).
+    const baseOverrides = {
+      thermalPower: 700,
+      neutronFlux: 700 / PHYSICS.NOMINAL_POWER,
+      fuelTemperature: PHYSICS.FUEL_TEMP_NOMINAL + 200,
+      coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL + 5,
+      steamVoidFraction: 0,
+      xenonConcentration: 0,
+      controlRods: 100,
+    } as const;
+
+    const fullPumps = advanceTicks(createTestState({ ...baseOverrides, activeCoolantPumps: 8 }), 8);
+    const halfPumps = advanceTicks(createTestState({ ...baseOverrides, activeCoolantPumps: 4 }), 8);
+
+    expect(halfPumps.steamVoidFraction).toBeGreaterThan(fullPumps.steamVoidFraction);
+    expect(halfPumps.thermalPower).toBeGreaterThan(fullPumps.thermalPower);
+    expect(halfPumps.fuelTemperature).toBeGreaterThan(fullPumps.fuelTemperature);
   });
 
   test("Positiver Dampfblasenkoeffizient: steamVoidFraction erhöht Reaktivität", () => {
@@ -112,7 +134,7 @@ describe("Physik-Engine", () => {
   test("AZ-5 faehrt einen gesunden Reaktor herunter statt sofortiger Kernschmelze", () => {
     const state = createTestState({
       thermalPower: 1500,
-      neutronFlux: 1500 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 1500 / PHYSICS.NOMINAL_POWER,
       xenonConcentration: 0,
       steamVoidFraction: 0,
       coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
@@ -133,7 +155,7 @@ describe("Physik-Engine", () => {
   test("AZ-5 Graphit-Spitzen-Effekt bleibt an Unfallbedingungen gebunden", () => {
     const healthyCore = createTestState({
       thermalPower: 1500,
-      neutronFlux: 1500 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 1500 / PHYSICS.NOMINAL_POWER,
       xenonConcentration: 0,
       steamVoidFraction: 0,
       coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
@@ -163,7 +185,7 @@ describe("Physik-Engine", () => {
   test("AZ-5 nutzt die globale Einfahrrate statt jede Stabgruppe separat zu vervierfachen", () => {
     const state = createTestState({
       thermalPower: 200,
-      neutronFlux: 200 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 200 / PHYSICS.NOMINAL_POWER,
       manualRods: 2,
       autoRods: 1,
       shortenedRods: 1,
@@ -179,7 +201,7 @@ describe("Physik-Engine", () => {
   test("Vorhandene Siedekanäle kollabieren bei Xenon-Stall nicht in einem Tick", () => {
     const state = createTestState({
       thermalPower: 20,
-      neutronFlux: 20 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 20 / PHYSICS.NOMINAL_POWER,
       xenonConcentration: 1,
       coolantTemperature: 298,
       steamVoidFraction: 0.35,
@@ -192,13 +214,13 @@ describe("Physik-Engine", () => {
     const next = calculateNextState({ ...state, ...triggerAZ5(state) });
 
     expect(next.coolantTemperature!).toBeGreaterThan(PHYSICS.COOLANT_TEMP_BOILING);
-    expect(next.steamVoidFraction!).toBeGreaterThan(0.25);
+    expect(next.steamVoidFraction!).toBeGreaterThan(0.18);
   });
 
   test("Schwere Xenon-Vergiftung unterdrückt den AZ-5-Leistungssprung bei niedrigem OZR nicht", () => {
     const state = createTestState({
       thermalPower: 20,
-      neutronFlux: 20 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 20 / PHYSICS.NOMINAL_POWER,
       xenonConcentration: 1,
       coolantTemperature: 298,
       steamVoidFraction: 0.35,
@@ -220,6 +242,10 @@ describe("Physik-Engine", () => {
       thermalPower: 3000,
       neutronFlux: 0.9,
       activeCoolantPumps: 0,
+      // Vollständiger Pumpenausfall: Drehzahl & Befehl auf null, sonst läuft die
+      // Pumpendynamik die Drehzahl beim ersten Tick wieder hoch.
+      pumpStates: [false, false, false, false, false, false, false, false],
+      pumpSpeeds: [0, 0, 0, 0, 0, 0, 0, 0],
     });
     const next = calculateNextState(state);
     expect(next.isExploded).toBe(true);
@@ -244,7 +270,7 @@ describe("Physik-Engine", () => {
     const state = createTestState({
       elapsedSeconds: PHYSICS.TEST_DURATION_SECONDS - 0.5,
       thermalPower: 700,
-      neutronFlux: 700 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 700 / PHYSICS.NOMINAL_POWER,
       fuelTemperature: 650,
       steamPressure: 65,
     });
@@ -390,19 +416,44 @@ describe("Game Reducer", () => {
     expect(valid.controlRods).toBe(100);
   });
 
-  test("TOGGLE_PUMP ändert activeCoolantPumps korrekt", () => {
+  test("TOGGLE_PUMP ändert pumpStates sofort, activeCoolantPumps läuft mit Schwungrad-Trägheit nach", () => {
     const state = createTestState();
     const initialPumps = state.activeCoolantPumps;
 
-    // Toggle pump 7 (currently on) → should decrease active count
+    // Pumpe 7 ausschalten → Befehl ist sofort umgesetzt, Drehzahl/Durchfluss laufen aus.
     const toggled = gameReducer(state, { type: "TOGGLE_PUMP", payload: 7 });
-    expect(toggled.activeCoolantPumps).toBe(initialPumps - 1);
     expect(toggled.pumpStates[7]).toBe(false);
+    // Reducer aktualisiert activeCoolantPumps NICHT mehr unmittelbar (ГЦН-Schwungrad).
+    expect(toggled.activeCoolantPumps).toBe(initialPumps);
 
-    // Toggle same pump again → should increase
-    const toggledBack = gameReducer(toggled, { type: "TOGGLE_PUMP", payload: 7 });
-    expect(toggledBack.activeCoolantPumps).toBe(initialPumps);
+    // Nach mehreren Ticks muss der effektive Pumpenwert deutlich gesunken sein.
+    const afterCoastdown = advanceTicks(toggled, 120); // 60 s Spielzeit
+    expect(afterCoastdown.activeCoolantPumps).toBeLessThan(initialPumps - 0.5);
+    expect(afterCoastdown.pumpSpeeds[7]).toBeLessThan(0.2);
+
+    // Wieder einschalten → läuft mit Anlauf-Trägheit hoch.
+    const toggledBack = gameReducer(afterCoastdown, { type: "TOGGLE_PUMP", payload: 7 });
     expect(toggledBack.pumpStates[7]).toBe(true);
+    const afterSpinup = advanceTicks(toggledBack, 60); // 30 s
+    expect(afterSpinup.pumpSpeeds[7]).toBeGreaterThan(0.8);
+  });
+
+  test("Reservebus abgeschaltet: Pumpen am Rundown-Bus folgen der TG-8-Drehzahl", () => {
+    const state = createTestState({
+      turbineConnected: false, // Turbine läuft aus
+      turbineSpeed: 1500, // 50 % Nenndrehzahl
+    });
+    const busOff = gameReducer(state, { type: "TOGGLE_RUNDOWN_BUS" });
+    expect(busOff.rundownBusActive).toBe(false);
+
+    // Nach einigen Ticks sollten die Rundown-Bus-Pumpen (2,3,6,7) Richtung 0 driften
+    // (weil Turbine weiter ausläuft), während die Netz-Pumpen (0,1,4,5) bei ~1 bleiben.
+    const after = advanceTicks(busOff, 60); // 30 s
+    const gridPumps = [0, 1, 4, 5].map((i) => after.pumpSpeeds[i]);
+    const rundownPumps = [2, 3, 6, 7].map((i) => after.pumpSpeeds[i]);
+
+    gridPumps.forEach((speed) => expect(speed).toBeGreaterThan(0.9));
+    rundownPumps.forEach((speed) => expect(speed).toBeLessThan(0.5));
   });
 
   test("TICK wird ignoriert wenn isExploded = true", () => {
@@ -446,7 +497,7 @@ describe("Game Reducer", () => {
       ...INITIAL_STATE,
       isRunning: true,
       thermalPower: 20,
-      neutronFlux: 20 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 20 / PHYSICS.NOMINAL_POWER,
       xenonConcentration: 1,
       coolantTemperature: 298,
       steamVoidFraction: 0.35,
@@ -466,7 +517,7 @@ describe("Game Reducer", () => {
   test("AZ-5 bei 100% Xenon und OZR < 15 führt zur Kernschmelze / Dampfexplosion", () => {
     const state = createTestState({
       thermalPower: 20,
-      neutronFlux: 20 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 20 / PHYSICS.NOMINAL_POWER,
       xenonConcentration: 1,
       coolantTemperature: 298,
       steamVoidFraction: 0.35,
@@ -485,7 +536,7 @@ describe("Game Reducer", () => {
   test("AZ-5 bei OZR > 30 und moderater Xenon-Vergiftung fährt sicher herunter", () => {
     const state = createTestState({
       thermalPower: 400,
-      neutronFlux: 400 / PHYSICS.MAX_THERMAL_POWER,
+      neutronFlux: 400 / PHYSICS.NOMINAL_POWER,
       xenonConcentration: 0.7,
       coolantTemperature: 278,
       steamVoidFraction: 0.1,

@@ -20,7 +20,7 @@ const CONTROL_TABLE = [
 
 export default function GamePage() {
   const [phase, setPhase] = useState<GamePhase>('briefing');
-  const [countdown, setCountdown] = useState(10);
+  const [countdown, setCountdown] = useState(120);
 
   useEffect(() => {
     if (phase !== 'briefing') return;
@@ -140,6 +140,87 @@ export default function GamePage() {
           </table>
         </div>
       </div>
+
+      {/* Time compression / physics-model disclosure */}
+      <section
+        style={{
+          marginTop: '32px',
+          padding: '16px 20px',
+          border: '1px solid var(--border)',
+          background: 'rgba(0,0,0,0.25)',
+        }}
+      >
+        <h2
+          style={{
+            fontFamily: 'var(--font-share-tech-mono), monospace',
+            fontSize: '1rem',
+            color: 'var(--warning-yellow)',
+            marginBottom: '12px',
+          }}
+        >
+          ZEITRAFFER &amp; PHYSIK-MODELL
+        </h2>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '24px',
+            fontSize: '0.85rem',
+            lineHeight: '1.6',
+            color: '#aaa',
+          }}
+        >
+          <div>
+            <p style={{ color: 'var(--amber)', marginBottom: '8px' }}>
+              SIMULATION (komprimiert)
+            </p>
+            <ul style={{ paddingLeft: '18px', margin: 0 }}>
+              <li>Schichtdauer: <strong style={{ color: 'var(--safe-green)' }}>8 Minuten</strong> (480 s).</li>
+              <li>
+                Iod-/Xenon-Dynamik läuft <strong style={{ color: 'var(--safe-green)' }}>~360-fach</strong>{' '}
+                beschleunigt (POISON_TIME_SCALE = 360). 1 Spielsekunde ≈ 6 simulierte Reaktorminuten,
+                damit die Xenon-Falle in einer spielbaren Session sichtbar wird.
+              </li>
+              <li>
+                AZ-5 fährt Stäbe in <strong style={{ color: 'var(--safe-green)' }}>18 s</strong> ein
+                (≈ 0,4 m/s, historisch korrekt). Der Graphit-Spitzen-Effekt entfaltet sich in den
+                ersten ~5 s.
+              </li>
+              <li>
+                Punktkinetik mit 6 verzögerten Neutronengruppen, 240 Substeps pro Tick — schneller
+                Excursionsverlauf bleibt physikalisch aufgelöst.
+              </li>
+            </ul>
+          </div>
+          <div>
+            <p style={{ color: 'var(--amber)', marginBottom: '8px' }}>
+              REALITÄT TSCHERNOBYL (25./26.04.1986)
+            </p>
+            <ul style={{ paddingLeft: '18px', margin: 0 }}>
+              <li>
+                Leistungsabsenkung von 3200 → ~1600 MW über{' '}
+                <strong style={{ color: 'var(--alarm-red)' }}>~9 Stunden</strong>; Test wegen
+                Lastverteiler verschoben.
+              </li>
+              <li>
+                Xenon-Vergiftung baute sich über{' '}
+                <strong style={{ color: 'var(--alarm-red)' }}>mehrere Stunden</strong> auf, Leistung
+                fiel um 00:28 auf ~30 MW.
+              </li>
+              <li>
+                Stabilisierungsversuch 01:00–01:23 → AZ-5 um{' '}
+                <strong style={{ color: 'var(--alarm-red)' }}>01:23:40</strong>, Explosion um{' '}
+                <strong style={{ color: 'var(--alarm-red)' }}>01:23:47</strong> — der prompte
+                Excursionsverlauf dauerte nur <strong>~4 Sekunden</strong>.
+              </li>
+              <li>
+                Spitzenleistung &gt; 30 GWth, Brennstoff &gt; 3000 °C, Zr-Cladding-Reaktion ab
+                1200 °C → Wasserstoffexplosion.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
 
       {/* Countdown + Start button */}
       <div

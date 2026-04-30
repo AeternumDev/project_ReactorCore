@@ -360,24 +360,72 @@ export default function ControlRodPanel({
     { id: 'MR', label: 'MR', fullLabel: 'MR — MANUELL', value: manualRods, max: PHYSICS.MANUAL_RODS_MAX, color: '#00aaff',
       disabled: false, modeTag: undefined,
       effectUp: 'Leistung ↑ Neutronenfluss ↑', effectDown: 'Leistung ↓ Absorption ↑',
+      info: `MR — RUCHNYJE STERZHNI REGULIROWANIJA
+Manuelle Regelstäbe (RBMK-1000 Block 4: ~139 Stück).
+
+ZWECK: Hauptsteuerung der radialen Leistungsverteilung
+und der Reaktivität im Normalbetrieb.
+
+KONSTRUKTION: Bor-Karbid-Absorber, von OBEN eingefahren,
+Antrieb über Selsyn-Servomotoren (~0,4 m/s).
+
+LEITSTAND: Der SIUR (Senior­ingenieur Reaktor­regelung)
+fuhr einzelne MR-Stäbe gruppenweise über Wahlschalter
+und Selsyn-Anzeigen. In dieser Simulation als Sammel-
+wert abstrahiert.`,
       onChange: (v: number) => dispatch({ type: 'SET_MANUAL_RODS', payload: v }),
       onStep: (d: number) => dispatch({ type: 'SET_MANUAL_RODS', payload: clamp(manualRods + d, 0, PHYSICS.MANUAL_RODS_MAX) }),
     },
     { id: 'AR', label: 'AR', fullLabel: 'AR — AUTOMATIK', value: autoRods, max: PHYSICS.AUTO_RODS_MAX, color: '#ffaa00',
       disabled: powerMode === 'auto', modeTag: powerMode === 'auto' ? 'LAR-AUTO' : 'HAND',
       effectUp: 'Feinregelung ↑ Leistung', effectDown: 'Feinregelung ↓ Leistung',
+      info: `AR — AWTOMATITSCHESKIJE REGULJATORY
+Automatische Regelstäbe (12 Stück, in 4 LAR-Gruppen
+zu je 3 Stäben).
+
+ZWECK: Feinregelung der Gesamtleistung und der
+lokalen Leistungsdichte (LAR — Lokales Auto­regel­system).
+
+NORMALBETRIEB: Auto-Modus aktiv, Operator gibt nur
+den Sollwert vor. Hand-Eingriff nur bei LAR-Ausfall
+oder unterhalb 10 % N(nom) — historisch genau die Lage
+am 26.04.1986 vor dem Versuch.`,
       onChange: (v: number) => dispatch({ type: 'SET_AUTO_RODS', payload: v }),
       onStep: (d: number) => dispatch({ type: 'SET_AUTO_RODS', payload: clamp(autoRods + d, 0, PHYSICS.AUTO_RODS_MAX) }),
     },
     { id: 'USP', label: 'USP', fullLabel: 'USP — VERKÜRZT', value: shortenedRods, max: PHYSICS.SHORTENED_RODS_MAX, color: '#ff44ff',
       disabled: false, modeTag: undefined,
       effectUp: 'Unterer Kern weniger absorbiert', effectDown: 'Gleichmäßigere Flussverteilung',
+      info: `USP — UKOROTSCHENNYJE STERSHNI-POGLOTSCHATELI
+Verkürzte Absorberstäbe (24 Stück), von UNTEN
+in den Kern eingefahren.
+
+ZWECK: Achsiale Leistungsverteilung formen — typisches
+RBMK-Problem ist die "doppelhöckrige" Flussverteilung.
+
+BESONDERHEIT: Wird selten umgestellt. Falsche USP-Lage
+verstärkt die positive Void-Rückkopplung im unteren
+Kern­bereich — direkt relevant für den Tschernobyl-
+Unfallhergang.`,
       onChange: (v: number) => dispatch({ type: 'SET_SHORTENED_RODS', payload: v }),
       onStep: (d: number) => dispatch({ type: 'SET_SHORTENED_RODS', payload: clamp(shortenedRods + d, 0, PHYSICS.SHORTENED_RODS_MAX) }),
     },
     { id: 'AZ', label: 'AZ', fullLabel: 'AZ — SICHERHEIT', value: safetyRods, max: PHYSICS.SAFETY_RODS_MAX, color: '#ff2222',
       disabled: true, modeTag: 'GESPERRT',
       effectUp: '', effectDown: '',
+      info: `AZ — AWARIJNAJA ZASCHTSCHITA
+Notschutz-Stäbe (24 Stück). NICHT manuell verstellbar.
+
+AUSLÖSUNG: Fall der AZ-Stäbe nur über AZ-5-Schalter
+oder automatische Schutz­signale (AZ-1 bis AZ-4).
+Einfahrzeit historisch ~18–21 Sekunden über die volle
+Höhe von 7 m — zu langsam, um eine prompt­kritische
+Exkursion zu stoppen.
+
+GRAPHIT-ENDSTÜCK: Pre-1986-Bauweise verdrängte beim
+Einfahren zunächst Wasser durch Graphit am unteren
+Stab­ende → kurzzeitige Reaktivitäts­erhöhung
+(„positiver Scram-Effekt").`,
       onChange: () => {}, onStep: () => {},
     },
   ];
@@ -452,8 +500,20 @@ OZR-Minimum: ${PHYSICS.MINIMUM_SAFE_RODS} Stabäquivalente`} />
               border: selectedGroup === g.id && !g.disabled ? `1px solid ${g.color}44` : '1px solid transparent',
               background: selectedGroup === g.id && !g.disabled ? `${g.color}06` : 'transparent',
               transition: 'all 0.2s',
+              position: 'relative',
             }}
           >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                top: '2px',
+                right: '2px',
+                zIndex: 2,
+              }}
+            >
+              <InfoTooltip text={g.info} />
+            </div>
             <AnalogGauge
               value={g.value}
               max={g.max}

@@ -76,6 +76,31 @@ body::after {
   animation: border-flash 0.5s ease-in-out infinite;
 }
 
+/* Event log row entry animation — slide in from the right with a brief
+   highlight flash, mimicking a teletype ticker punching out a new line. */
+@keyframes event-row-in {
+  0% {
+    transform: translateX(12px);
+    opacity: 0;
+    background: rgba(255, 140, 0, 0.18);
+  }
+  60% {
+    transform: translateX(0);
+    opacity: 1;
+    background: rgba(255, 140, 0, 0.10);
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+    background: transparent;
+  }
+}
+
+.event-row-in {
+  animation: event-row-in 600ms ease-out both;
+  will-change: transform, opacity, background;
+}
+
 /* Industrial glow borders */
 .glow-amber {
   box-shadow: 0 0 8px var(--amber);

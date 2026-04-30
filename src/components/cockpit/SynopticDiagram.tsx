@@ -45,8 +45,8 @@ function WarningTile({ x, y, w, h, label, active, color, blink }: {
   active: boolean; color: string; blink?: boolean;
 }) {
   const lines = Array.isArray(label) ? label : [label];
-  const fontSize = lines.length > 1 ? 4.6 : 6.2;
-  const firstLineY = lines.length > 1 ? y + h / 2 - 1.8 : y + h / 2 + 2;
+  const fontSize = lines.length > 1 ? 5.8 : 7.6;
+  const firstLineY = lines.length > 1 ? y + h / 2 - 1.6 : y + h / 2 + 2.6;
 
   return (
     <g>
@@ -71,7 +71,7 @@ function WarningTile({ x, y, w, h, label, active, color, blink }: {
         fontWeight={active ? 'bold' : 'normal'}
         letterSpacing="0.15">
         {lines.map((line, index) => (
-          <tspan key={`${line}-${index}`} x={x + w / 2} dy={index === 0 ? 0 : 5.2}>
+          <tspan key={`${line}-${index}`} x={x + w / 2} dy={index === 0 ? 0 : 6.4}>
             {line}
           </tspan>
         ))}
@@ -110,7 +110,8 @@ export default function SynopticDiagram({
 
   // ── Warning states ──────────────────────────────────────────
   const warnOverpower   = thermalPower > PHYSICS.TEST_POWER_MAX;
-  const critOverpower   = thermalPower > PHYSICS.MAX_THERMAL_POWER * 0.8;
+  // BAZ-Auslösung bei 110 % Nennleistung — gleiche Quelle wie der Notabschalt-Setpoint.
+  const critOverpower   = thermalPower > PHYSICS.NOMINAL_POWER * PHYSICS.BAZ_POWER_THRESHOLD;
   const warnCoolantTemp = coolantTemperature > PHYSICS.COOLANT_TEMP_BOILING - 4;
   const critCoolantTemp = coolantTemperature > PHYSICS.COOLANT_TEMP_BOILING;
   const warnFuelTemp    = fuelTemperature > PHYSICS.FUEL_TEMP_WARNING;
@@ -124,7 +125,8 @@ export default function SynopticDiagram({
   const warnOZR         = reactivityMargin < PHYSICS.OZR_WARNING;
   const critOZR         = reactivityMargin < PHYSICS.OZR_MINIMUM_SAFE;
   const warnFlowLow     = coolantFlowRate < PHYSICS.BAZ_COOLANT_FLOW_MIN;
-  const warnTurbineOver = turbineSpeed > PHYSICS.TURBINE_MAX_SPEED * 0.9;
+  // Reale Überdrehzahl-Auslösung des TG-8 ≈ 1,04 × Nenndrehzahl (3120 RPM).
+  const warnTurbineOver = turbineSpeed > PHYSICS.TURBINE_NOMINAL_SPEED * 1.04;
   const warnXenon       = xenonConcentration > 0.4;
   const critXenon       = xenonConcentration > 0.7;
 
@@ -177,7 +179,7 @@ export default function SynopticDiagram({
     { label: ['XENON', 'KRIT.'],        active: critXenon,        color: '#ff2020', blink: true  },
     { label: ['AZ-5', 'AKTIV'],         active: az5Active,        color: '#ff2020', blink: true  },
     { label: ['BAZ', 'GESPERRT'],       active: !bazArmed,        color: '#ff5533', blink: false },
-    { label: ['ECCS', 'AUS'],           active: !eccsEnabled,     color: '#ff2020', blink: true  },
+    { label: ['SAOR', 'AUS'],           active: !eccsEnabled,     color: '#ff2020', blink: true  },
     { label: ['NOTKÜHL.', 'ANF.'],      active: !eccsEnabled && (critOverpower || critCoolantTemp), color: '#ff2020', blink: true },
     { label: ['EIGENBED.', 'FEHLT'],    active: generatorOutput < 5 && turbineConnected, color: '#ff8800', blink: false },
 
@@ -186,12 +188,12 @@ export default function SynopticDiagram({
     { label: ['KÜHLMITT.', 'SIEDET'],   active: critCoolantTemp,  color: '#ff2020', blink: true  },
     { label: ['BRENNST.', 'HEISS'],     active: warnFuelTemp,     color: '#ffd700', blink: warnFuelTemp },
     { label: ['BRENNST.', 'KRIT.'],     active: critFuelTemp,     color: '#ff2020', blink: true  },
-    { label: ['DAMPFANT.', 'HOCH'],     active: warnVoid,         color: '#ffd700', blink: false },
-    { label: ['DAMPFANT.', 'KRIT.'],    active: critVoid,         color: '#ff2020', blink: true  },
-    { label: ['KERN', 'HEISS'],         active: fuelTemperature > 1000, color: '#ff8800', blink: false },
+    { label: ['VOID', 'HOCH'],          active: warnVoid,         color: '#ffd700', blink: false },
+    { label: ['VOID', 'KRIT.'],         active: critVoid,         color: '#ff2020', blink: true  },
+    { label: ['STAB', 'AUSWURF'],       active: critPressure && steamVoidFraction > 0.25, color: '#ff2020', blink: true },
     { label: ['UNTERKÜHL.', 'NIEDR.'],  active: coolantTemperature > PHYSICS.COOLANT_TEMP_BOILING - PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD, color: '#ff8800', blink: false },
     { label: ['WÄRMEABF.', 'NIEDR.'],   active: coolantFlowRate < PHYSICS.COOLANT_FLOW_NOMINAL * 0.7, color: '#ffd700', blink: false },
-    { label: ['VERDAMPF.', 'HOCH'],     active: steamVoidFraction > 0.15, color: '#ff8800', blink: false },
+    { label: ['KAVITATION', 'HKP'],     active: coolantTemperature > PHYSICS.COOLANT_TEMP_BOILING - PHYSICS.CAVITATION_SUBCOOLING_THRESHOLD && coolantFlowRate < PHYSICS.COOLANT_FLOW_NOMINAL * 0.85, color: '#ff8800', blink: false },
     { label: ['DELTA T', 'HOCH'],       active: fuelTemperature - coolantTemperature > 700, color: '#ff8800', blink: false },
 
     // Row 2 — Dampf & Wasser
@@ -201,7 +203,7 @@ export default function SynopticDiagram({
     { label: ['TROMMEL', 'HOCH'],       active: warnDrumHigh,     color: '#ffd700', blink: warnDrumHigh },
     { label: ['SPEISEW.', 'NIEDR.'],    active: feedWaterFlow < 200, color: '#ffd700', blink: false },
     { label: ['SPEISEW.', 'HOCH'],      active: feedWaterFlow > 800, color: '#ffd700', blink: false },
-    { label: ['FRISCHD.', 'HOCH'],      active: steamPressure > 75, color: '#ff8800', blink: false },
+    { label: ['FRISCHD.', 'HOCH'],      active: steamPressure > PHYSICS.STEAM_PRESSURE_WARNING + 2, color: '#ff8800', blink: false },
     { label: ['KÜHLFLUSS', 'NIEDR.'],   active: warnFlowLow,      color: '#ffd700', blink: true  },
     { label: ['PUMPEN', '< 6'],         active: activeCoolantPumps < 6, color: '#ffd700', blink: false },
     { label: ['TG-8', 'AUSLAUF'],       active: turbineValveOpen === 0 && turbineConnected && turbineSpeed > 100, color: '#cccccc', blink: false },
@@ -218,7 +220,7 @@ export default function SynopticDiagram({
     { label: 'HKP-8',     active: !pumpStates[7],   color: '#ff2020', blink: !pumpStates[7] },
     { label: ['TG-8', 'ÜBERDREH'],      active: warnTurbineOver,  color: '#ffd700', blink: true  },
     { label: ['GENERATOR', 'AUSFALL'],  active: generatorOutput < 10 && turbineConnected, color: '#ff5533', blink: false },
-    { label: ['NETZSPG.', 'AUS'],       active: generatorOutput < 5, color: '#ff2020', blink: false },
+    { label: ['LAR/LAC', 'SPERRE'],     active: !bazArmed && thermalPower > PHYSICS.TEST_POWER_TARGET, color: '#ff5533', blink: false },
   ];
 
   return (
@@ -247,7 +249,7 @@ export default function SynopticDiagram({
         </span>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%">
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', maxWidth: `${W * 1.4}px`, margin: '0 auto' }} preserveAspectRatio="xMidYMid meet">
         <defs>
           <marker id="arrowHot" viewBox="0 0 8 8" refX="7" refY="4"
             markerWidth="5" markerHeight="5" orient="auto">
@@ -295,15 +297,15 @@ export default function SynopticDiagram({
           fill="none" stroke="#0f0f0f" strokeWidth="0.5" />
 
         {/* Panel title */}
-        <text x="10" y="13" fill="#555" fontSize="7" fontFamily="monospace"
+        <text x="10" y="14" fill="#666" fontSize="8.5" fontFamily="monospace"
           letterSpacing="1.5" fontWeight="bold">
           WARNANZEIGEN
         </text>
         {/* Row category markers */}
-        <text x={tx(0)} y={TY0 - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">REAKT</text>
-        <text x={tx(0)} y={TY0 + TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">THERM</text>
-        <text x={tx(0)} y={TY0 + 2 * TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">WASSER</text>
-        <text x={tx(0)} y={TY0 + 3 * TR - 2} fill="#2a2a2a" fontSize="3.5" fontFamily="monospace">SYSTEM</text>
+        <text x={tx(0)} y={TY0 - 2} fill="#3a3a3a" fontSize="4.6" fontFamily="monospace">REAKT</text>
+        <text x={tx(0)} y={TY0 + TR - 2} fill="#3a3a3a" fontSize="4.6" fontFamily="monospace">THERM</text>
+        <text x={tx(0)} y={TY0 + 2 * TR - 2} fill="#3a3a3a" fontSize="4.6" fontFamily="monospace">WASSER</text>
+        <text x={tx(0)} y={TY0 + 3 * TR - 2} fill="#3a3a3a" fontSize="4.6" fontFamily="monospace">SYSTEM</text>
 
         {/* Render all 44 tiles */}
         {tiles.map((tile, i) => {
@@ -327,7 +329,8 @@ export default function SynopticDiagram({
           stroke="#1a1a1a" strokeWidth="0.5" />
 
         {/* ============== */}
-        {/*  ECCS SYSTEM   */}
+        {/*  SAOR SYSTEM   */}
+        {/* (САОР — Notkühlsystem des Reaktors) */}
         {/* ============== */}
         <rect x={ECCS.x - ECCS.w / 2} y={ECCS.y - ECCS.h / 2} width={ECCS.w} height={ECCS.h} rx="3"
           fill={eccsEnabled ? 'rgba(0,255,65,0.04)' : 'rgba(255,32,32,0.04)'}
@@ -335,7 +338,7 @@ export default function SynopticDiagram({
           strokeWidth="1" strokeDasharray={eccsEnabled ? 'none' : '4 2'} />
         <text x={ECCS.x} y={ECCS.y - 14} textAnchor="middle"
           fill={eccsEnabled ? '#00ff41' : '#ff2020'}
-          fontSize="6" fontFamily="monospace" fontWeight="bold">ECCS</text>
+          fontSize="6" fontFamily="monospace" fontWeight="bold">SAOR</text>
         <circle cx={ECCS.x} cy={ECCS.y - 2} r="5"
           fill={eccsEnabled ? 'rgba(0,255,65,0.35)' : 'rgba(255,32,32,0.35)'}
           stroke={eccsEnabled ? '#00ff41' : '#ff2020'} strokeWidth="0.8"

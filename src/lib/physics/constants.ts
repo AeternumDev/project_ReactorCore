@@ -1,6 +1,9 @@
 export const PHYSICS = {
   // Leistungsparameter — Zielleistung 700 MW ("Golden Zone")
-  MAX_THERMAL_POWER: 3200,
+  // MAX_THERMAL_POWER ist die maximal zulaessige Dauerleistung; NOMINAL_POWER ist
+  // der Auslegungspunkt. Sie sind absichtlich entkoppelt, damit Kuehlmittel- und
+  // Druckverlaeufe (~MAX) nicht am Auslegungspunkt (~NOMINAL) gesaettigt werden.
+  MAX_THERMAL_POWER: 4000,
   NOMINAL_POWER: 3200,
   DECAY_HEAT_FLOOR: 16,
   TEST_POWER_TARGET: 700,           // Ziel: 700 MW thermisch ("Golden Zone")
@@ -22,7 +25,10 @@ export const PHYSICS = {
     { beta: 0.000273, lambda: 3.01 },
   ] as const,
   TOTAL_DELAYED_NEUTRON_FRACTION: 0.006502,
-  POISON_TIME_SCALE: 60,
+  // Echte Iod/Xenon-Dynamik laeuft auf Stundenskala. Fuer eine 8-Minuten-Session
+  // muessen wir staerker raffen, sonst sieht der Spieler nie die Vergiftung,
+  // die Tschernobyl-Operatoren in die Falle gelockt hat.
+  POISON_TIME_SCALE: 360,
 
   // Reaktivitaetsbeitraege (delta-k/k)
   BASE_EXCESS_REACTIVITY: 0.0275,
@@ -59,11 +65,22 @@ export const PHYSICS = {
   COOLANT_TEMP_BOILING: 286,
   COOLANT_FLOW_NOMINAL: 7000,
   COOLANT_FLOW_PER_PUMP: 875,
+  // Pumpendynamik — ГЦН‑317 hat ~6 t Schwungrad und läuft nach Stromverlust ~45 s aus.
+  // Mit exponentieller Annäherung entspricht τ≈22 s einem Auslauf auf ~10 % Drehzahl
+  // nach 45 s — der Lückenschluss, den der Turbinen-Auslauftest demonstrieren sollte.
+  PUMP_COASTDOWN_TAU: 22,           // Zeitkonstante für den Auslauf nach Stromverlust [s]
+  PUMP_SPINUP_TAU: 4,               // Zeitkonstante für den Anlauf nach Einschaltung [s]
+  PUMP_ACTIVE_THRESHOLD: 0.2,       // Drehzahlanteil, ab dem eine Pumpe als „AKTIV" zählt
+  // Vier von acht ГЦН waren beim Auslauftest am Reservebus, der vom auslaufenden TG-8 versorgt wurde.
+  PUMP_RUNDOWN_BUS_INDICES: [2, 3, 6, 7] as const,
+  PUMP_LEFT_LOOP_INDICES: [0, 1, 2, 3] as const,
+  PUMP_RIGHT_LOOP_INDICES: [4, 5, 6, 7] as const,
   COOLANT_TEMP_RESPONSE: 0.12,      // Trägheit der Massenströmung im Primärkreis
   VOID_RESPONSE: 0.2,               // Dampfblasen kollabieren/entstehen nicht instantan
-  COOLANT_HEATUP_RANGE: 34,
+  COOLANT_HEATUP_RANGE: 42.5,
   COOLANT_TIME_CONSTANT: 4.5,
-  VOID_TIME_CONSTANT: 1.8,
+  // Dampfblasen entstehen bei einem Loss-of-Flow innerhalb von ~1-2 s, nicht 5 s.
+  VOID_TIME_CONSTANT: 1.0,
   SATURATION_TEMPERATURE_OFFSET: 251,
   SATURATION_TEMPERATURE_SLOPE: 0.55,
 
@@ -85,13 +102,19 @@ export const PHYSICS = {
   STEAM_PRESSURE_WARNING: 80,
   STEAM_PRESSURE_CRITICAL: 95,
   PRESSURE_VOID_GAIN: 32,
-  PRESSURE_POWER_GAIN: 14,
+  PRESSURE_POWER_GAIN: 17.5,
   PRESSURE_COOLING_GAIN: 7,
 
-  // Positiver Dampfblasenkoeffizient (RBMK-Konstruktionsfehler, +4,5 bis +5,0 β)
-  VOID_COEFFICIENT: 0.024,
+  // Positiver Dampfblasenkoeffizient (RBMK-Konstruktionsfehler, +4,5 bis +5,0 β).
+  // 0,030 entspricht ~4,6 β bei beta=0,0065 — am oberen Ende der RBMK-1000-Spanne.
+  VOID_COEFFICIENT: 0.030,
   VOID_FORMATION_RANGE: 30,          // °C über Siedepunkt für vollen Dampfblasenanteil
   LOW_POWER_VOID_AMPLIFICATION: 3,   // Verstärkung des Void-Koeffizienten bei niedriger Leistung
+  // Bei reduziertem Kühlmitteldurchfluss steigt die Enthalpie pro Kanal stark an,
+  // sodass die oberen Kanalabschnitte sieden, lange bevor die mittlere Kühlmittel-
+  // temperatur die Sättigung erreicht. Das Bulk-Modell unterschätzt diesen Effekt –
+  // diese Verstärkung bildet das Kanal-Austritts-Sieden bei Pumpenausfall ab.
+  FLOW_INDUCED_VOID_GAIN: 0.65,
 
   // AZ-5 Graphit-Spitzen-Effekt (5 Sekunden — "Point of No Return")
   AZ5_GRAPHIT_SPIKE_DURATION: 5,
@@ -124,6 +147,11 @@ export const PHYSICS = {
   // Kavitation
   CAVITATION_SUBCOOLING_THRESHOLD: 3, // °C Unterkühlung unter der Kavitation beginnt
   CAVITATION_FLOW_PENALTY: 0.85,      // Durchfluss-Multiplikator bei Kavitation
+  // Kuehlmitteluntergrenze — bei totalem Pumpenausfall verschwindet die Waermeabfuhr
+  // praktisch vollstaendig, sodass selbst Nachzerfallswaerme das Brennelement aufschmilzt
+  // (TMI-/LOCA-Szenario, hier auf Spielzeit komprimiert).
+  EFFECTIVE_COOLING_FLOOR: 0.002,
+  EFFECTIVE_COOLING_LOCA_THRESHOLD: 0.05, // unterhalb dieses Niveaus dominiert Restwaerme
   // Trommelabscheider
   DRUM_LEVEL_NOMINAL: 50,          // %
   DRUM_LEVEL_LOW: 20,              // %
