@@ -6,9 +6,10 @@ export const PHYSICS = {
   MAX_THERMAL_POWER: 4000,
   NOMINAL_POWER: 3200,
   DECAY_HEAT_FLOOR: 16,
-  TEST_POWER_TARGET: 700,           // Ziel: 700 MW thermisch ("Golden Zone")
-  TEST_POWER_MIN: 700,              // Untere Grenze des Stabilisierungsbands
-  TEST_POWER_MAX: 1000,             // Obere Grenze des Stabilisierungsbands
+  TEST_POWER_TARGET: 700,           // Historisches Ziel: 700 MW thermisch
+  TEST_POWER_TOLERANCE: 50,         // Spielbarer Haltekorridor um das 700-MW-Ziel
+  TEST_POWER_MIN: 650,              // Untere Grenze des Haltekorridors
+  TEST_POWER_MAX: 750,              // Obere Grenze des Haltekorridors
   DANGER_POWER_LEVEL: 200,          // Katastrophenniveau — hohe Effizienz, hohe Gefahr
   XENON_STALL_POWER: 30,            // Leistungsboden bei schwerer Xenon-Vergiftung
   TEST_DURATION_SECONDS: 480,
@@ -30,8 +31,11 @@ export const PHYSICS = {
   // die Tschernobyl-Operatoren in die Falle gelockt hat.
   POISON_TIME_SCALE: 360,
 
-  // Reaktivitaetsbeitraege (delta-k/k)
-  BASE_EXCESS_REACTIVITY: 0.0275,
+  // Reaktivitätsbeiträge (delta-k/k)
+  // BASE_EXCESS_REACTIVITY enthält jetzt explizit die Gleichgewichts-Xenon-Vergiftung
+  // (~−2,5 % Δk/k). Im Klartext: 0,0525 = 0,0275 „reiner" Überschuss + 0,025 Xe-Eq.
+  // → bei voller Bestrahlung mit Xe=1 bleibt netto die historisch dokumentierte Reserve.
+  BASE_EXCESS_REACTIVITY: 0.0525,
   TOTAL_ROD_WORTH: 0.036,
   DOPPLER_COEFFICIENT: -0.000011,
   COOLANT_DENSITY_COEFFICIENT: -0.00003,
@@ -47,16 +51,30 @@ export const PHYSICS = {
   SHORTENED_RODS_MAX: 32,
   SAFETY_RODS_MAX: 24,
 
-  // Xenon / Iod-135 — echte gekoppelte ODE-Struktur, aber auf spielbare Zeit komprimiert
-  XENON_BUILD_DELAY: 30,
-  XENON_DECAY_RATE: 0.0015,
-  XENON_BUILD_RATE: 0.003,
-  XENON_MAX_REACTIVITY_PENALTY: 0.05,
-  IODINE_DECAY_CONSTANT: Math.LN2 / (6.57 * 3600),
-  XENON_DECAY_CONSTANT: Math.LN2 / (9.14 * 3600),
-  IODINE_YIELD_COEFFICIENT: 0.00028,
-  XENON_DIRECT_YIELD_COEFFICIENT: 0.00005,
-  XENON_BURNUP_COEFFICIENT: 0.00015,
+  // Xenon / Iod-135 — gekoppelte ODE in NORMALISIERTEN Einheiten:
+  //   Iod- und Xenon-Konzentration werden so skaliert, dass das Gleichgewicht
+  //   bei Vollast (Fluss = 1) genau 1.0 ergibt. Damit ist „Xenon = 1" das normale
+  //   Betriebsgift, „Xenon = 2…3" der Tschernobyl-typische Xenon-Pit nach
+  //   Leistungsabsenkung (≈10 h reale Zeit, hier auf Sekunden komprimiert).
+  // Yields wurden so kalibriert, dass Σ_in / Σ_out = 1 bei φ = 1, I = 1.
+  // Reaktivitätsverlust pro Einheit normalisierter Xenon-Konzentration.
+  // BASE_EXCESS_REACTIVITY enthält den Xe=1-Gleichgewichtsverlust bereits als
+  // kritischen Referenzoffset, sodass Normal-Xenon den Startzustand nicht abwürgt.
+  XENON_EQUILIBRIUM_CONCENTRATION: 1.0,
+  XENON_MAX_REACTIVITY_PENALTY: 0.025,
+  // Maximale physikalische Xenon-Überhöhung über Gleichgewicht (Pit ≈ 2,5–3×).
+  XENON_PIT_CAP: 3.5,
+  XENON_WARNING_CONCENTRATION: 1.5,
+  XENON_SEVERE_CONCENTRATION: 2.5,
+  IODINE_DECAY_CONSTANT: Math.LN2 / (6.57 * 3600),    // λ_I  ≈ 2,93·10⁻⁵ /s
+  XENON_DECAY_CONSTANT: Math.LN2 / (9.14 * 3600),     // λ_Xe ≈ 2,11·10⁻⁵ /s
+  // I-Yield in normalisierten Einheiten: γ_I = λ_I → I_eq(φ=1) = 1.
+  IODINE_YIELD_COEFFICIENT: Math.LN2 / (6.57 * 3600),
+  // Direct-Xe-Yield: gewählt damit Xe_eq(φ=1, I=1) = 1.
+  // Σ_in = γ_xe·φ + λ_I·I = γ_xe + λ_I ; Σ_out = λ_Xe + σφ → γ_xe = λ_Xe + σφ_full − λ_I
+  XENON_DIRECT_YIELD_COEFFICIENT: 2.51e-4,
+  // σ·φ bei Vollast — realistischer Wert ~2,6·10⁻⁴ /s (σ_Xe ≈ 2,6·10⁶ b, φ ≈ 10¹⁴).
+  XENON_BURNUP_COEFFICIENT: 2.6e-4,
 
   // Kühlmittel
   // 270°C = Kaltseite (Basis). Bei 1500 MWth berechnet sich 284°C (Referenz-Eintritt).
@@ -168,7 +186,7 @@ export const PHYSICS = {
   SCORE_PENALTY_PER_ALARM: 200,
   SCORE_BONUS_TEST_SUCCESS: 3000,
   SCORE_BONUS_ECCS_DISABLED: 500,
-  SCORE_BONUS_STABLE_LOW_POWER: 1500, // Bonus für stabile Leistung im 700–1000 MW Zielband
+  SCORE_BONUS_STABLE_LOW_POWER: 1500, // Bonus fuer stabile Leistung um 700 MW
   SCORE_BONUS_DANGER_ZONE: 20,       // Risiko-Bonus pro Tick bei ~200 MW (hohe Effizienz, hohe Gefahr)
 
   // Tick-Rate

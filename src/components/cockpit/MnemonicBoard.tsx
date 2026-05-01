@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback } from 'react';
 import {
-  CHANNELS, CORE_GRID, CORE_RADIUS, ROD_COLORS, ChannelInfo, RodType,
+  CHANNELS, CORE_GRID, CORE_RADIUS, ROD_COLORS, ChannelInfo,
   getHeatColor, getNeutronColor, getCoreWarnings, Quadrant,
 } from './coreLayout';
 import { PHYSICS } from '@/lib/physics/constants';
@@ -95,18 +95,21 @@ function getChannelRodColor(
   return '#2a3a2a';
 }
 
+export function getMnemonicXenonColor(xenonConcentration: number): string {
+  if (xenonConcentration > PHYSICS.XENON_SEVERE_CONCENTRATION) return 'var(--alarm-red)';
+  if (xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION) return 'var(--warning-yellow)';
+  return 'var(--safe-green)';
+}
+
 export default function MnemonicBoard({
   thermalPower,
   neutronFlux,
   isExploded,
-  az5Active,
-  az5Timer,
   controlRods,
   coreTemperatureZones,
   manualRods,
   autoRods,
   shortenedRods,
-  safetyRods,
   xenonConcentration,
   reactivityMargin,
   dispatch,
@@ -330,8 +333,7 @@ export default function MnemonicBoard({
         fontSize: '0.6rem',
       }}>
         <span style={{
-          color: xenonConcentration > 0.6 ? 'var(--alarm-red)' :
-            xenonConcentration > 0.3 ? 'var(--warning-yellow)' : 'var(--safe-green)',
+          color: getMnemonicXenonColor(xenonConcentration),
         }}>
           Xe:{(xenonConcentration * 100).toFixed(0)}%
         </span>

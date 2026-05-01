@@ -46,7 +46,7 @@ const CHECKLIST: ChecklistItem[] = [
     id: 'power-band',
     step: '01',
     title: 'LEISTUNG IN DEN VERSUCHSBEREICH BRINGEN',
-    instruction: `Reaktorleistung auf ${PHYSICS.TEST_POWER_MIN}–${PHYSICS.TEST_POWER_MAX} MW(th) absenken.`,
+    instruction: `Reaktorleistung auf ${PHYSICS.TEST_POWER_TARGET} MW(th) absenken.`,
     check: (context) => (
       context.thermalPower >= PHYSICS.TEST_POWER_MIN &&
       context.thermalPower <= PHYSICS.TEST_POWER_MAX
@@ -56,7 +56,7 @@ const CHECKLIST: ChecklistItem[] = [
     id: 'power-hold',
     step: '02',
     title: 'LEISTUNG STABIL HALTEN',
-    instruction: `Leistung ${POWER_HOLD_SECONDS} Sekunden durchgehend im Bereich ${PHYSICS.TEST_POWER_MIN}–${PHYSICS.TEST_POWER_MAX} MW(th) halten.`,
+    instruction: `Leistung ${POWER_HOLD_SECONDS} Sekunden durchgehend nahe ${PHYSICS.TEST_POWER_TARGET} MW(th) halten.`,
     check: (context) => context.stablePowerSeconds >= POWER_HOLD_SECONDS,
   },
   {
@@ -109,7 +109,7 @@ const CHECKLIST: ChecklistItem[] = [
     id: 'observe-rundown',
     step: '08',
     title: 'AUSLAUF KONTROLLIERT BEOBACHTEN',
-    instruction: `Auslauf mindestens ${RUNDOWN_OBSERVATION_SECONDS} Sekunden beobachten und dabei Leistung unter ${PHYSICS.TEST_POWER_MAX} MW(th) sowie Kühlfluss oberhalb von ${PHYSICS.BAZ_COOLANT_FLOW_MIN} L/s halten.`,
+    instruction: `Auslauf mindestens ${RUNDOWN_OBSERVATION_SECONDS} Sekunden beobachten und dabei Leistung nahe ${PHYSICS.TEST_POWER_TARGET} MW(th) sowie Kühlfluss oberhalb von ${PHYSICS.BAZ_COOLANT_FLOW_MIN} L/s halten.`,
     check: (context) => (
       context.rundownSeconds >= RUNDOWN_OBSERVATION_SECONDS &&
       context.thermalPower <= PHYSICS.TEST_POWER_MAX &&

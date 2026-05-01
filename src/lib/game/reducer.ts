@@ -26,8 +26,12 @@ export const INITIAL_STATE: ReactorState = {
   thermalPower: 1500,
   neutronFlux: INITIAL_NEUTRON_FLUX,
   delayedNeutronPrecursors: createEquilibriumDelayedNeutronPrecursors(INITIAL_NEUTRON_FLUX),
-  iodineConcentration: 0.35,
-  xenonConcentration: 0.05,  // niedrig — Xenon bei hoher Leistung abgebrannt
+  // I/Xe in normalisierten Einheiten (1.0 = Gleichgewicht bei Vollast).
+  // Reaktor lief vor dem Test stundenlang auf Nennleistung → I, Xe ≈ 1.
+  // Sobald die Leistung unter ~700 MW gedrückt wird, baut sich der Xenon-Pit
+  // auf (Xe → 2…3) und schliesst die historische Falle.
+  iodineConcentration: 1.0,
+  xenonConcentration: 1.0,
   coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
   // Equilibrium fuel temp at 1500MW with 8 pumps:
   // 270 + (2800-270) * (1500/3200) / 1.0 ≈ 1455°C

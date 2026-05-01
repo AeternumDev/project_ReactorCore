@@ -100,7 +100,7 @@ export default function Home() {
 
           <p style={{ marginBottom: '8px' }}>
             <span style={{ color: 'var(--amber)' }}>ZIEL:</span>{' '}
-            Stabilisiere die Leistung im Bereich <strong style={{ color: '#fff' }}>700–1000&nbsp;MW</strong> und
+            Stabilisiere die Leistung bei <strong style={{ color: '#fff' }}>700&nbsp;MW</strong> und
             halte sie dort, während der Turbinen-Auslauftest durchgeführt wird.
           </p>
 
@@ -122,7 +122,7 @@ export default function Home() {
 
           <p>
             <span style={{ color: 'var(--safe-green)' }}>ERFOLG:</span>{' '}
-            Stabile Leistung bei 700–1000&nbsp;MW über die gesamte Testdauer.
+            Stabile Leistung bei 700&nbsp;MW über die gesamte Testdauer.
             Xenon-Vergiftung unter Kontrolle. Kein Auslösen der Notabschaltung (AZ-5) nötig.
           </p>
         </div>

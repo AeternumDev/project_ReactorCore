@@ -5,10 +5,11 @@ import {
   RUNDOWN_OBSERVATION_SECONDS,
   TestChecklistPanelProps,
 } from '@/components/cockpit/TestChecklistPanel';
+import { PHYSICS } from '@/lib/physics/constants';
 
 describe('buildChecklistProgress', () => {
   const baseProps: TestChecklistPanelProps = {
-    thermalPower: 850,
+    thermalPower: PHYSICS.TEST_POWER_TARGET,
     eccsEnabled: false,
     turbineConnected: true,
     turbineValveOpen: 80,

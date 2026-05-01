@@ -1,4 +1,5 @@
-import { calculateNextState, triggerAZ5 } from "@/lib/physics/engine";
+import { describe, expect, test } from "@jest/globals";
+import { calculateNextState, createEquilibriumDelayedNeutronPrecursors, triggerAZ5 } from "@/lib/physics/engine";
 import { PHYSICS } from "@/lib/physics/constants";
 import { calculateScore } from "@/lib/game/scoring";
 import { gameReducer, INITIAL_STATE } from "@/lib/game/reducer";
@@ -40,25 +41,55 @@ function advanceTicks(state: ReactorState, tickCount: number): ReactorState {
 }
 
 describe("Physik-Engine", () => {
-  test("Xenon steigt bei niedriger Leistung (< 700 MW Ziel)", () => {
-    const state = createTestState({
-      thermalPower: 500, // unter 700 MW → Xenon-Aufbau
-      neutronFlux: 500 / PHYSICS.NOMINAL_POWER,
-      xenonConcentration: 0.3,
-    });
-    const next = calculateNextState(state);
-    expect(next.xenonConcentration!).toBeGreaterThan(0.3);
+  test("Startzustand setzt Iod/Xenon auf Vollleistungs-Gleichgewicht", () => {
+    expect(INITIAL_STATE.iodineConcentration).toBe(PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION);
+    expect(INITIAL_STATE.xenonConcentration).toBe(PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION);
   });
 
-  test("Xenon sinkt bei hoher Leistung (> 70% nominal)", () => {
+  test("Xenon-Pit baut sich nach Leistungsabsenkung auf (Iod-Zerfall überholt Burnup)", () => {
+    // Reaktor lief auf Vollast (I, Xe ≈ 1) und fällt auf 500 MW (15 % Fluss).
+    // Bei niedrigem Fluss überwiegt Iod→Xe‐Zerfall den Burnup → Xenon wächst.
     const state = createTestState({
-      thermalPower: 2500, // ~78% of 3200
+      thermalPower: 500,
+      neutronFlux: 500 / PHYSICS.NOMINAL_POWER,
+      iodineConcentration: 1.0,
+      xenonConcentration: 1.0,
+    });
+    const next = calculateNextState(state);
+    expect(next.xenonConcentration!).toBeGreaterThan(1.0);
+  });
+
+  test("Xenon brennt nach Leistungsanstieg (Pit → Vollast) ab und gibt positive Reaktivität frei", () => {
+    // Klassische Pit-Erholung: Xe ist im Pit (1.8) und der Reaktor wird zurückgefahren.
+    // Bei hohem Fluss dominiert σφ·Xe → Xenon sinkt rasch.
+    const state = createTestState({
+      thermalPower: 2500,
       neutronFlux: 2500 / PHYSICS.NOMINAL_POWER,
-      xenonConcentration: 0.5,
+      iodineConcentration: 0.4,
+      xenonConcentration: 1.8,
       controlRods: 50,
     });
     const next = calculateNextState(state);
-    expect(next.xenonConcentration!).toBeLessThan(0.5);
+    expect(next.xenonConcentration!).toBeLessThan(1.8);
+  });
+
+  test("Xenon-Pit allein verursacht keine Kernschmelze", () => {
+    const state = createTestState({
+      thermalPower: 700,
+      neutronFlux: 700 / PHYSICS.NOMINAL_POWER,
+      iodineConcentration: 1.0,
+      xenonConcentration: PHYSICS.XENON_SEVERE_CONCENTRATION,
+      steamVoidFraction: 0,
+      manualRods: 111,
+      autoRods: 6,
+      shortenedRods: 20,
+      safetyRods: 8,
+    });
+
+    const afterPit = advanceTicks(state, 40);
+
+    expect(afterPit.isExploded).toBe(false);
+    expect(afterPit.thermalPower).toBeLessThanOrEqual(state.thermalPower);
   });
 
   test("Mehr Kühlmittelpumpen senken fuelTemperature", () => {
@@ -100,7 +131,8 @@ describe("Physik-Engine", () => {
       fuelTemperature: PHYSICS.FUEL_TEMP_NOMINAL + 200,
       coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL + 5,
       steamVoidFraction: 0,
-      xenonConcentration: 0,
+      iodineConcentration: 1.0,
+      xenonConcentration: PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION,
       controlRods: 100,
     } as const;
 
@@ -117,13 +149,13 @@ describe("Physik-Engine", () => {
       steamVoidFraction: 0,
       controlRods: 100,
       neutronFlux: 0.3,
-      xenonConcentration: 0,
+      xenonConcentration: PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION,
     });
     const withVoid = createTestState({
       steamVoidFraction: 0.5,
       controlRods: 100,
       neutronFlux: 0.3,
-      xenonConcentration: 0,
+      xenonConcentration: PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION,
     });
     const nextNoVoid = calculateNextState(noVoid);
     const nextWithVoid = calculateNextState(withVoid);
@@ -135,7 +167,8 @@ describe("Physik-Engine", () => {
     const state = createTestState({
       thermalPower: 1500,
       neutronFlux: 1500 / PHYSICS.NOMINAL_POWER,
-      xenonConcentration: 0,
+      iodineConcentration: 1.0,
+      xenonConcentration: PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION,
       steamVoidFraction: 0,
       coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
     });
@@ -156,7 +189,8 @@ describe("Physik-Engine", () => {
     const healthyCore = createTestState({
       thermalPower: 1500,
       neutronFlux: 1500 / PHYSICS.NOMINAL_POWER,
-      xenonConcentration: 0,
+      iodineConcentration: 1.0,
+      xenonConcentration: PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION,
       steamVoidFraction: 0,
       coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
     });
@@ -307,9 +341,9 @@ describe("Physik-Engine", () => {
 });
 
 describe("Score-Berechnung", () => {
-  test("Basiswert ist 10000 bei 700 MW (Zielband 700–1000)", () => {
+  test("Basiswert ist 10000 bei historischem 700-MW-Ziel", () => {
     const state = createTestState({
-      thermalPower: 700, // within 700–1000 target range
+      thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
       testCompleted: false,
       eccsEnabled: false,
@@ -318,7 +352,7 @@ describe("Score-Berechnung", () => {
     expect(score).toBe(PHYSICS.BASE_SCORE);
   });
 
-  test("Abzug wenn Leistung außerhalb 700–1000 MW", () => {
+  test("Abzug wenn Leistung außerhalb des 700-MW-Haltekorridors liegt", () => {
     const state = createTestState({
       thermalPower: 500, // below target
       events: [],
@@ -329,9 +363,9 @@ describe("Score-Berechnung", () => {
     expect(score).toBe(PHYSICS.BASE_SCORE - PHYSICS.SCORE_PENALTY_PER_SECOND_OFF_TARGET);
   });
 
-  test("Kein Abzug bei 1000 MW (obere Grenze)", () => {
+  test("Kein Abzug an der oberen Toleranzgrenze", () => {
     const state = createTestState({
-      thermalPower: 1000,
+      thermalPower: PHYSICS.TEST_POWER_MAX,
       events: [],
       testCompleted: false,
     });
@@ -341,7 +375,7 @@ describe("Score-Berechnung", () => {
 
   test("Bonus bei testCompleted", () => {
     const state = createTestState({
-      thermalPower: 700,
+      thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
       testCompleted: true,
       eccsEnabled: true,
@@ -352,7 +386,7 @@ describe("Score-Berechnung", () => {
 
   test("Bonus bei !eccsEnabled && testCompleted", () => {
     const state = createTestState({
-      thermalPower: 700,
+      thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
       testCompleted: true,
       eccsEnabled: false,
@@ -363,9 +397,9 @@ describe("Score-Berechnung", () => {
     );
   });
 
-  test("Stabile-Leistung-Bonus nach 60 s im 700–1000 MW Zielband", () => {
+  test("Stabile-Leistung-Bonus nach 60 s nahe 700 MW", () => {
     const state = createTestState({
-      thermalPower: 800,
+      thermalPower: PHYSICS.TEST_POWER_TARGET,
       xenonConcentration: 0.4,
       elapsedSeconds: 65,
       events: [],
@@ -375,16 +409,16 @@ describe("Score-Berechnung", () => {
     expect(score).toBe(PHYSICS.BASE_SCORE + PHYSICS.SCORE_BONUS_STABLE_LOW_POWER);
   });
 
-  test("Kein Stabile-Bonus bei hohem Xenon (≥ 0.7)", () => {
+  test("Kein Stabile-Bonus bei Xenon-Pit (≥ 1.2)", () => {
     const state = createTestState({
-      thermalPower: 800,
-      xenonConcentration: 0.75,
+      thermalPower: PHYSICS.TEST_POWER_TARGET,
+      xenonConcentration: 1.5,
       elapsedSeconds: 65,
       events: [],
       testCompleted: false,
     });
     const score = calculateScore(state);
-    // No stable bonus, just base + off-target penalty (800 is in range, so just base)
+    // No stable bonus, just base score at the target power.
     expect(score).toBe(PHYSICS.BASE_SCORE);
   });
 
@@ -454,6 +488,24 @@ describe("Game Reducer", () => {
 
     gridPumps.forEach((speed) => expect(speed).toBeGreaterThan(0.9));
     rundownPumps.forEach((speed) => expect(speed).toBeLessThan(0.5));
+  });
+
+  test("Vollständiger HKP-Ausfall erzeugt Void, Temperatur- und Leistungsspitze", () => {
+    let state = gameReducer(INITIAL_STATE, { type: "START_GAME" });
+    const initialPower = state.thermalPower;
+    const initialFuelTemperature = state.fuelTemperature;
+
+    for (let pumpIndex = 0; pumpIndex < 8; pumpIndex += 1) {
+      state = gameReducer(state, { type: "TOGGLE_PUMP", payload: pumpIndex });
+    }
+
+    const afterTrip = advanceTicks(state, 15);
+
+    expect(afterTrip.pumpStates.every((isCommandedOn) => !isCommandedOn)).toBe(true);
+    expect(afterTrip.activeCoolantPumps).toBeLessThan(6);
+    expect(afterTrip.steamVoidFraction).toBeGreaterThan(0.1);
+    expect(afterTrip.fuelTemperature).toBeGreaterThan(initialFuelTemperature);
+    expect(afterTrip.thermalPower).toBeGreaterThan(initialPower);
   });
 
   test("TICK wird ignoriert wenn isExploded = true", () => {
@@ -533,17 +585,39 @@ describe("Game Reducer", () => {
     expect(afterScram.isExploded).toBe(true);
   });
 
-  test("AZ-5 bei OZR > 30 und moderater Xenon-Vergiftung fährt sicher herunter", () => {
+  test("AZ-5 bei Xenon-Pit, OZR < 15 und Void führt zur Chernobyl-artigen Exkursion", () => {
+    const state = createTestState({
+      thermalPower: 20,
+      neutronFlux: 20 / PHYSICS.NOMINAL_POWER,
+      xenonConcentration: PHYSICS.XENON_SEVERE_CONCENTRATION,
+      coolantTemperature: 298,
+      steamVoidFraction: 0.35,
+      fuelTemperature: 700,
+      manualRods: 0,
+      autoRods: 0,
+      shortenedRods: 0,
+      safetyRods: 8,
+    });
+
+    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, 10);
+
+    expect(afterScram.isExploded).toBe(true);
+    expect(afterScram.thermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
+  });
+
+  test("AZ-5 bei OZR > 30 und Xenon nahe Gleichgewicht fährt sicher herunter", () => {
+    const lowPowerFlux = 400 / PHYSICS.NOMINAL_POWER;
     const state = createTestState({
       thermalPower: 400,
-      neutronFlux: 400 / PHYSICS.NOMINAL_POWER,
-      xenonConcentration: 0.7,
+      neutronFlux: lowPowerFlux,
+      delayedNeutronPrecursors: createEquilibriumDelayedNeutronPrecursors(lowPowerFlux),
+      xenonConcentration: 1.0,
       coolantTemperature: 278,
-      steamVoidFraction: 0.1,
+      steamVoidFraction: 0.05,
       fuelTemperature: 800,
-      manualRods: 30,
-      autoRods: 6,
-      shortenedRods: 6,
+      manualRods: 100,
+      autoRods: 8,
+      shortenedRods: 20,
       safetyRods: 8,
     });
 

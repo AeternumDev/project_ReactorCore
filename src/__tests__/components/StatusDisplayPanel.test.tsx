@@ -1,6 +1,7 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import StatusDisplayPanel from '@/components/cockpit/StatusDisplayPanel';
+import { PHYSICS } from '@/lib/physics/constants';
 
 // Mock CSS variables for JSDOM
 beforeAll(() => {
@@ -15,8 +16,8 @@ beforeAll(() => {
 
 describe('StatusDisplayPanel', () => {
   const baseProps = {
-    thermalPower: 200,
-    xenonConcentration: 0.3,
+    thermalPower: PHYSICS.TEST_POWER_TARGET,
+    xenonConcentration: PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION,
     steamPressure: 65,
     elapsedSeconds: 120,
     coolantTemperature: 270,
@@ -25,29 +26,56 @@ describe('StatusDisplayPanel', () => {
     steamVoidFraction: 0.1,
     neutronFlux: 0.06,
     generatorOutput: 180,
-    reactivityMargin: 26,
+    reactivityMargin: 40,
     controlRods: 50,
     manualRods: 26,
   };
 
-  it('renders correct MW display', () => {
-    const { container } = render(
-      <StatusDisplayPanel {...baseProps} />
-    );
-    expect(container).toMatchSnapshot();
+  function renderPanel(overrides: Partial<typeof baseProps> = {}) {
+    render(<StatusDisplayPanel {...baseProps} {...overrides} />);
+  }
+
+  it('renders the historical 700 MW target and equilibrium xenon display', () => {
+    renderPanel();
+
+    expect(screen.getByText('ZIEL: 700 MW (TOLERANZ +/-50 MW)')).toBeInTheDocument();
+    expect(screen.getByText('700 MW')).toHaveStyle({ color: 'var(--safe-green)' });
+    expect(screen.getByText('100%')).toHaveStyle({ color: 'var(--amber)' });
+    expect(screen.getByText('ZIEL 700 MW — LEISTUNG STABIL — ZUSTAND HALTEN')).toHaveStyle({
+      color: 'var(--safe-green)',
+    });
   });
 
-  it('shows warning color for power above 250 MW', () => {
-    const { container } = render(
-      <StatusDisplayPanel {...baseProps} thermalPower={400} />
-    );
-    expect(container).toMatchSnapshot();
+  it('warns when power is below the 700 MW hold window', () => {
+    renderPanel({ thermalPower: 500 });
+
+    expect(screen.getByText('500 MW')).toHaveStyle({ color: 'var(--warning-yellow)' });
+    expect(screen.getByText('LEISTUNG UNTER 700 MW — MR-STÄBE AUSFAHREN')).toHaveStyle({
+      color: 'var(--warning-yellow)',
+    });
   });
 
-  it('shows green for power within 150-250 MW band', () => {
-    const { container } = render(
-      <StatusDisplayPanel {...baseProps} thermalPower={200} />
-    );
-    expect(container).toMatchSnapshot();
+  it('warns when power exceeds the 700 MW hold window', () => {
+    renderPanel({ thermalPower: 800 });
+
+    expect(screen.getByText('800 MW')).toHaveStyle({ color: 'var(--warning-yellow)' });
+    expect(screen.getByText('LEISTUNG ÜBER 700 MW — MR-STÄBE EINFAHREN')).toHaveStyle({
+      color: 'var(--warning-yellow)',
+    });
+  });
+
+  it('uses shared xenon thresholds for pit warning colors', () => {
+    renderPanel({ xenonConcentration: PHYSICS.XENON_WARNING_CONCENTRATION + 0.01 });
+
+    expect(screen.getByText('151%')).toHaveStyle({ color: 'var(--warning-yellow)' });
+    expect(screen.getByText('ZIEL 700 MW — XENON-PIT → STABPOSITION BEOBACHTEN')).toHaveStyle({
+      color: 'var(--safe-green)',
+    });
+  });
+
+  it('marks the clock as blinking in the final minute', () => {
+    renderPanel({ elapsedSeconds: PHYSICS.TEST_DURATION_SECONDS - 30 });
+
+    expect(screen.getByText('07:30')).toHaveClass('animate-blink');
   });
 });

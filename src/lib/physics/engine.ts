@@ -246,11 +246,16 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     );
   }
 
-  if (core.xenonConcentration > 0.5 && state.xenonConcentration <= 0.5) {
+  // Gleichgewichts-Xenon ist normalisiert 1.0; ein Pit zeichnet sich erst ab
+  // Xe ≳ 1.5 ab (≈50 % über Sollwert) — das ist die historisch relevante Falle.
+  if (
+    core.xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION &&
+    state.xenonConcentration <= PHYSICS.XENON_WARNING_CONCENTRATION
+  ) {
     addEventIfNew(
       events,
       elapsed,
-      `XENON-VERGIFTUNG ERHÖHT — Konzentration ${(core.xenonConcentration * 100).toFixed(0)} %, Reaktivitätsreserve sinkt`,
+      `XENON-PIT ENTWICKELT — Konzentration ${(core.xenonConcentration * 100).toFixed(0)} % des Gleichgewichts, Reaktivitätsreserve schwindet`,
       "warning",
       "xenon",
     );
@@ -409,16 +414,6 @@ export function triggerBAZ(state: ReactorState): Partial<ReactorState> {
   };
 }
 
-function calculateAz5GraphiteSpikeFactor(state: ReactorState, az5Timer: number): number {
-  const graphiteReactivity = calculateAz5GraphiteTipReactivity(state, az5Timer);
-  if (graphiteReactivity <= 0) {
-    return 1;
-  }
-
-  const normalizedWorth = graphiteReactivity / PHYSICS.AZ5_GRAPHITE_LOW_ORM_REACTIVITY;
-  return 1 + normalizedWorth;
-}
-
 function calculateAz5GraphiteTipReactivity(state: ReactorState, az5Timer: number): number {
   const insertionElapsed = PHYSICS.AZ5_FULL_INSERTION_TIME - az5Timer;
   if (insertionElapsed >= PHYSICS.AZ5_GRAPHIT_SPIKE_DURATION) {
@@ -573,7 +568,7 @@ function integrateCoreDynamics(state: ReactorState, control: CoreControlState): 
       state.neutronFlux
     ),
     iodineConcentration: Math.max(0, state.iodineConcentration),
-    xenonConcentration: clamp01(state.xenonConcentration),
+    xenonConcentration: clamp(state.xenonConcentration, 0, PHYSICS.XENON_PIT_CAP),
     fuelTemperature: Math.max(PHYSICS.FUEL_TEMP_NOMINAL, state.fuelTemperature),
     fuelSurfaceTemperature: Math.max(state.coolantTemperature, state.fuelSurfaceTemperature),
     claddingTemperature: Math.max(state.coolantTemperature, state.claddingTemperature),
@@ -636,7 +631,7 @@ function integrateCoreDynamics(state: ReactorState, control: CoreControlState): 
     core.neutronFlux = clamp(core.neutronFlux + neutronDot * subDt, 0, FLUX_CAP);
     core.delayedNeutronPrecursors = nextPrecursors;
     core.iodineConcentration = Math.max(0, core.iodineConcentration + iodineDot * subDt);
-    core.xenonConcentration = clamp01(core.xenonConcentration + xenonDot * subDt);
+    core.xenonConcentration = clamp(core.xenonConcentration + xenonDot * subDt, 0, PHYSICS.XENON_PIT_CAP);
     core.coolantTemperature = Math.max(
       PHYSICS.COOLANT_TEMP_NOMINAL,
       core.coolantTemperature +

@@ -37,6 +37,16 @@ function pipeWidth(flowRate: number): number {
   return Math.max(2, Math.min(5, (flowRate / PHYSICS.COOLANT_FLOW_NOMINAL) * 3.5));
 }
 
+export function getSynopticXenonWarningState(xenonConcentration: number): {
+  warnXenon: boolean;
+  critXenon: boolean;
+} {
+  return {
+    warnXenon: xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION,
+    critXenon: xenonConcentration > PHYSICS.XENON_SEVERE_CONCENTRATION,
+  };
+}
+
 type WarningLabel = string | [string, string];
 
 /* ─── Dense annunciator tile used above the synoptic ─── */
@@ -127,8 +137,7 @@ export default function SynopticDiagram({
   const warnFlowLow     = coolantFlowRate < PHYSICS.BAZ_COOLANT_FLOW_MIN;
   // Reale Überdrehzahl-Auslösung des TG-8 ≈ 1,04 × Nenndrehzahl (3120 RPM).
   const warnTurbineOver = turbineSpeed > PHYSICS.TURBINE_NOMINAL_SPEED * 1.04;
-  const warnXenon       = xenonConcentration > 0.4;
-  const critXenon       = xenonConcentration > 0.7;
+  const { warnXenon, critXenon } = getSynopticXenonWarningState(xenonConcentration);
 
   const coreColor = critOverpower ? '#ff2020' : warnOverpower ? '#cc8800' : '#448844';
   const coreGlow  = powerFraction > 0.5

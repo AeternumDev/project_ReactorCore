@@ -32,8 +32,9 @@ function getColorForPower(power: number): string {
 }
 
 function getColorForXenon(xc: number): string {
-  if (xc > 0.7) return 'var(--alarm-red)';
-  if (xc > 0.4) return 'var(--warning-yellow)';
+  // Xe = 1.0 ist Gleichgewicht (normal). Pit ≥ 1.5 = gefährlich, ≥ 2.5 = un-restartable.
+  if (xc > PHYSICS.XENON_SEVERE_CONCENTRATION) return 'var(--alarm-red)';
+  if (xc > PHYSICS.XENON_WARNING_CONCENTRATION) return 'var(--warning-yellow)';
   return 'var(--amber)';
 }
 
@@ -104,8 +105,6 @@ export default function StatusDisplayPanel({
   neutronFlux,
   generatorOutput,
   reactivityMargin,
-  controlRods,
-  manualRods,
 }: StatusDisplayPanelProps) {
   const remaining = PHYSICS.TEST_DURATION_SECONDS - elapsedSeconds;
   const isLastMinute = remaining <= 60 && remaining > 0;
@@ -113,21 +112,21 @@ export default function StatusDisplayPanel({
   // --- Operator guidance ---
   function getGuidanceMessage(): { text: string; color: string } {
     if (thermalPower < PHYSICS.TEST_POWER_MIN) {
-      if (xenonConcentration > 0.6) {
-        return { text: 'LEISTUNG ZU NIEDRIG — XENON-VERGIFTUNG HOCH → MR AUSFAHREN, USP PRÜFEN', color: 'var(--warning-yellow)' };
+      if (xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION) {
+        return { text: 'LEISTUNG ZU NIEDRIG — XENON-PIT → MR AUSFAHREN, USP PRÜFEN', color: 'var(--warning-yellow)' };
       }
-      return { text: 'LEISTUNG ZU NIEDRIG — MR-STÄBE AUSFAHREN UM 200 MW ZU ERREICHEN', color: 'var(--warning-yellow)' };
+      return { text: 'LEISTUNG UNTER 700 MW — MR-STÄBE AUSFAHREN', color: 'var(--warning-yellow)' };
     }
     if (thermalPower > PHYSICS.TEST_POWER_MAX) {
-      return { text: 'LEISTUNG ÜBER ZIELBAND — MR-STÄBE EINFAHREN', color: 'var(--warning-yellow)' };
+      return { text: 'LEISTUNG ÜBER 700 MW — MR-STÄBE EINFAHREN', color: 'var(--warning-yellow)' };
     }
-    if (xenonConcentration > 0.6) {
-      return { text: 'IM ZIELBAND — XENON ERHÖHT → STABPOSITION BEOBACHTEN', color: 'var(--safe-green)' };
+    if (xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION) {
+      return { text: 'ZIEL 700 MW — XENON-PIT → STABPOSITION BEOBACHTEN', color: 'var(--safe-green)' };
     }
     if (reactivityMargin < PHYSICS.OZR_WARNING) {
-      return { text: 'IM ZIELBAND — OZR NIEDRIG → STABMANAGEMENT ERFORDERLICH', color: 'var(--warning-yellow)' };
+      return { text: 'ZIEL 700 MW — OZR NIEDRIG → STABMANAGEMENT ERFORDERLICH', color: 'var(--warning-yellow)' };
     }
-    return { text: 'IM ZIELBAND — 200 MW STABIL — ZUSTAND HALTEN', color: 'var(--safe-green)' };
+    return { text: 'ZIEL 700 MW — LEISTUNG STABIL — ZUSTAND HALTEN', color: 'var(--safe-green)' };
   }
 
   const guidance = getGuidanceMessage();
@@ -166,7 +165,7 @@ export default function StatusDisplayPanel({
           color: '#666',
           marginBottom: '2px',
         }}>
-          ZIEL: {PHYSICS.TEST_POWER_MIN}–{PHYSICS.TEST_POWER_MAX} MW (STABILISIERUNG BEI 200 MW)
+          ZIEL: {PHYSICS.TEST_POWER_TARGET} MW (TOLERANZ +/-{PHYSICS.TEST_POWER_TOLERANCE} MW)
         </div>
         <div style={{
           fontFamily: 'var(--font-share-tech-mono), monospace',
@@ -186,8 +185,8 @@ export default function StatusDisplayPanel({
           color={getColorForPower(thermalPower)}
         />
         <Display
-          label="XENON-VERGIFTUNG"
-          value={`${(xenonConcentration * 100).toFixed(1)}%`}
+          label="XENON (% v. GLEICHGEW.)"
+          value={`${(xenonConcentration * 100).toFixed(0)}%`}
           color={getColorForXenon(xenonConcentration)}
         />
         <Display

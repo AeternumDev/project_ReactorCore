@@ -24,7 +24,7 @@ type Phase = 'startup' | 'stabilize' | 'xenon_recovery' | 'power_descent' | 'ste
 
 function getPhase(thermalPower: number, xenon: number, ozr: number, elapsed: number): Phase {
   if (ozr < PHYSICS.OZR_MINIMUM_SAFE) return 'critical';
-  if (xenon > 0.55 && thermalPower < PHYSICS.TEST_POWER_MIN) return 'xenon_recovery';
+  if (xenon > 1.5 && thermalPower < PHYSICS.TEST_POWER_MIN) return 'xenon_recovery';
   if (thermalPower < PHYSICS.TEST_POWER_MIN && elapsed < 60) return 'startup';
   if (thermalPower < PHYSICS.TEST_POWER_MIN) return 'power_descent';
   if (thermalPower > PHYSICS.TEST_POWER_MAX) return 'power_descent';
@@ -37,13 +37,13 @@ function getPhaseInfo(phase: Phase) {
     case 'startup':
       return { label: 'ANFAHRPHASE', goal: `Leistung auf ${PHYSICS.TEST_POWER_TARGET} MW bringen`, instruction: 'MR-Stäbe AUSFAHREN. AR auf AUTOMATIK.', color: '#00aaff' };
     case 'stabilize':
-      return { label: 'STABILISIERUNG', goal: `${PHYSICS.TEST_POWER_MIN}–${PHYSICS.TEST_POWER_MAX} MW halten`, instruction: 'Kleine MR-Korrekturen. AR gleicht aus.', color: 'var(--warning-yellow)' };
+      return { label: 'STABILISIERUNG', goal: `${PHYSICS.TEST_POWER_TARGET} MW halten`, instruction: 'Kleine MR-Korrekturen. AR gleicht aus.', color: 'var(--warning-yellow)' };
     case 'xenon_recovery':
       return { label: 'XENON-VERGIFTUNG', goal: 'Xenon kompensieren', instruction: 'MR+USP AUSFAHREN. OZR beachten!', color: '#ff44ff' };
     case 'power_descent':
       return { label: 'LEISTUNGSKORREKTUR', goal: `Zurück auf ${PHYSICS.TEST_POWER_TARGET} MW`, instruction: 'MR anpassen: zu hoch → EINFAHREN, zu niedrig → AUSFAHREN.', color: 'var(--warning-yellow)' };
     case 'steady':
-      return { label: 'STABIL', goal: `Zielband ${PHYSICS.TEST_POWER_MIN}–${PHYSICS.TEST_POWER_MAX} MW`, instruction: 'Minimale Korrekturen. Xenon+OZR beobachten.', color: 'var(--safe-green)' };
+      return { label: 'STABIL', goal: `Ziel ${PHYSICS.TEST_POWER_TARGET} MW`, instruction: 'Minimale Korrekturen. Xenon+OZR beobachten.', color: 'var(--safe-green)' };
     case 'critical':
       return { label: '⚠ KRITISCH', goal: 'OZR unter Minimum!', instruction: 'Stäbe EINFAHREN oder AZ-5!', color: 'var(--alarm-red)' };
   }
@@ -536,7 +536,7 @@ OZR-Minimum: ${PHYSICS.MINIMUM_SAFE_RODS} Stabäquivalente`} />
         <StatusLED active={powerMode === 'auto'} color="#ffaa00" label="LAR-AUTO" />
         <StatusLED active={controlRods < PHYSICS.OZR_WARNING} color="var(--warning-yellow)" label="OZR↓" />
         <StatusLED active={controlRods < PHYSICS.MINIMUM_SAFE_RODS} color="var(--alarm-red)" label="OZR MIN" />
-        <StatusLED active={xenonConcentration > 0.5} color="#ff44ff" label="Xe HOCH" />
+        <StatusLED active={xenonConcentration > 1.5} color="#ff44ff" label="Xe HOCH" />
       </div>
 
       {/* ─── Phase guidance — operator placard ─── */}
