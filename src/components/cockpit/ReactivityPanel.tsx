@@ -54,6 +54,12 @@ export default function ReactivityPanel({
     if (reactivityMargin < PHYSICS.OZR_MINIMUM_SAFE) {
       return { text: '⚠ OZR KRITISCH — Sofortmaßnahmen erforderlich', color: 'var(--alarm-red)' };
     }
+    if (reactivityMargin < PHYSICS.OZR_WARNING) {
+      return { text: '→ OZR NIEDRIG — weitere Stabausfahrt vermeiden', color: 'var(--warning-yellow)' };
+    }
+    if (xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION) {
+      return { text: '→ XENON HOCH — kleine Korrekturen, OZR beobachten', color: 'var(--warning-yellow)' };
+    }
     return { text: '● Stabposition angemessen', color: 'var(--safe-green)' };
   }
   const rodGuidance = getRodGuidance();

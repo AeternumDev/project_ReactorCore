@@ -8,61 +8,60 @@ import {
 import { PHYSICS } from "@/lib/physics/constants";
 import { calculateScore } from "./scoring";
 
-const INITIAL_NEUTRON_FLUX = 1500 / PHYSICS.NOMINAL_POWER;
+const INITIAL_NEUTRON_FLUX = PHYSICS.TEST_POWER_TARGET / PHYSICS.NOMINAL_POWER;
 
 export const INITIAL_STATE: ReactorState = {
-  controlRods: 145,
+  controlRods: 26,
   activeCoolantPumps: 8,
   eccsEnabled: false,
   coolantFlowRate: 8 * PHYSICS.COOLANT_FLOW_PER_PUMP,
 
-  // Stabgruppen — 145 eingefahrene Stabäquivalente, aber mit realistisch kleinem AZ-Anteil.
-  // So bleibt der Startzustand stabil, waehrend der Spieler den OZR spaeter in den Unfallbereich ziehen kann.
-  manualRods: 111,
-  autoRods: 6,
-  shortenedRods: 20,
-  safetyRods: 8,
+  // Stabgruppen um 01:15:47: niedriger OZR, aber noch knapp oberhalb der
+  // Sofortabschaltgrenze. Die letzten Minuten koennen den OZR in den Unfallbereich ziehen.
+  manualRods: 14,
+  autoRods: 4,
+  shortenedRods: 4,
+  safetyRods: 4,
 
-  thermalPower: 1500,
+  thermalPower: PHYSICS.TEST_POWER_TARGET,
   neutronFlux: INITIAL_NEUTRON_FLUX,
   delayedNeutronPrecursors: createEquilibriumDelayedNeutronPrecursors(INITIAL_NEUTRON_FLUX),
   // I/Xe in normalisierten Einheiten (1.0 = Gleichgewicht bei Vollast).
-  // Reaktor lief vor dem Test stundenlang auf Nennleistung → I, Xe ≈ 1.
-  // Sobald die Leistung unter ~700 MW gedrückt wird, baut sich der Xenon-Pit
-  // auf (Xe → 2…3) und schliesst die historische Falle.
-  iodineConcentration: 1.0,
-  xenonConcentration: 1.0,
+  // Die vorangegangene Leistungsabsenkung steckt im Initialzustand: Iod ist
+  // bereits abgefallen, Xenon liegt deutlich über dem Niedrigleistungs-Gleichgewicht.
+  iodineConcentration: 0.49,
+  xenonConcentration: 1.45,
   coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
-  // Equilibrium fuel temp at 1500MW with 8 pumps:
-  // 270 + (2800-270) * (1500/3200) / 1.0 ≈ 1455°C
-  fuelTemperature: 950,
-  fuelSurfaceTemperature: 780,
-  claddingTemperature: 310,
+  fuelTemperature: PHYSICS.FUEL_TEMP_NOMINAL,
+  fuelSurfaceTemperature: 330,
+  claddingTemperature: 285,
   steamPressure: PHYSICS.STEAM_PRESSURE_NOMINAL,
   steamVoidFraction: 0,
   coreTemperatureZones: [
-    950 * 0.98,
-    950 * 1.04,
-    950 * 0.96,
-    950 * 1.02,
+    PHYSICS.FUEL_TEMP_NOMINAL * 0.98,
+    PHYSICS.FUEL_TEMP_NOMINAL * 1.04,
+    PHYSICS.FUEL_TEMP_NOMINAL * 0.96,
+    PHYSICS.FUEL_TEMP_NOMINAL * 1.02,
   ],
 
-  // Turbine (Turbogenerator 8 läuft für den Test)
+  // Turbine (Turbogenerator 8 läuft noch; Auslauf beginnt erst beim Teststart)
   turbineConnected: true,
   turbineValveOpen: 80,
-  turbineSpeed: 2900,
-  generatorOutput: 400,
+  turbineAuto: false,
+  turbineSpeed: PHYSICS.TURBINE_NOMINAL_SPEED,
+  generatorOutput: 52,
 
   // Trommelabscheider
   drumSeparatorLevel: 50,
   feedWaterFlow: PHYSICS.FEED_WATER_NOMINAL,
+  feedWaterAuto: false,
 
-  // Leistungsregelung — Ziel: 700 MW ("Golden Zone")
+  // Leistungsregelung — realer Zustand in den letzten Minuten: ca. 200 MW
   powerMode: 'manual',
-  powerSetpoint: 700,
+  powerSetpoint: PHYSICS.TEST_POWER_TARGET,
 
-  // OZR — anfangs gesund, aber nicht durch ein unrealistisch grosses AZ-Bucket blockiert
-  reactivityMargin: 145,
+  // OZR — niedriger historischer Warnbereich, aber noch nicht die 8-Stab-Endlage
+  reactivityMargin: 26,
 
   // BAZ (historisch: war deaktiviert/blockiert durch Bediener)
   bazArmed: false,
@@ -75,9 +74,9 @@ export const INITIAL_STATE: ReactorState = {
   score: PHYSICS.BASE_SCORE,
   events: [],
 
-  targetPower: 700,
+  targetPower: PHYSICS.TEST_POWER_TARGET,
   xenonBuildupRate: 0,
-  lastPowerLevel: 1500,
+  lastPowerLevel: PHYSICS.TEST_POWER_TARGET,
 
   az5Active: false,
   az5Timer: 0,
@@ -180,6 +179,9 @@ export function gameReducer(state: ReactorState, action: GameAction): ReactorSta
     case 'TOGGLE_TURBINE':
       return { ...state, turbineConnected: !state.turbineConnected };
 
+    case 'TOGGLE_TURBINE_AUTO':
+      return { ...state, turbineAuto: !state.turbineAuto };
+
     case 'SET_TURBINE_VALVE':
       return {
         ...state,
@@ -191,6 +193,9 @@ export function gameReducer(state: ReactorState, action: GameAction): ReactorSta
         ...state,
         feedWaterFlow: Math.max(0, Math.min(1000, action.payload)),
       };
+
+    case 'TOGGLE_FEED_WATER_AUTO':
+      return { ...state, feedWaterAuto: !state.feedWaterAuto };
 
     case 'SET_POWER_MODE':
       return { ...state, powerMode: action.payload };

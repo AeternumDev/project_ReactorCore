@@ -1,18 +1,21 @@
 export const PHYSICS = {
-  // Leistungsparameter — Zielleistung 700 MW ("Golden Zone")
+  // Leistungsparameter — historischer Start ca. 8 Minuten vor der Explosion.
   // MAX_THERMAL_POWER ist die maximal zulaessige Dauerleistung; NOMINAL_POWER ist
   // der Auslegungspunkt. Sie sind absichtlich entkoppelt, damit Kuehlmittel- und
   // Druckverlaeufe (~MAX) nicht am Auslegungspunkt (~NOMINAL) gesaettigt werden.
   MAX_THERMAL_POWER: 4000,
   NOMINAL_POWER: 3200,
   DECAY_HEAT_FLOOR: 16,
-  TEST_POWER_TARGET: 700,           // Historisches Ziel: 700 MW thermisch
-  TEST_POWER_TOLERANCE: 50,         // Spielbarer Haltekorridor um das 700-MW-Ziel
-  TEST_POWER_MIN: 650,              // Untere Grenze des Haltekorridors
-  TEST_POWER_MAX: 750,              // Obere Grenze des Haltekorridors
+  TEST_POWER_TARGET: 200,           // Realer Leistungsbereich vor dem TG-8-Auslauf
+  TEST_POWER_TOLERANCE: 50,         // Spielbarer Haltekorridor um den 200-MW-Zustand
+  TEST_POWER_MIN: 150,              // Untere Grenze des Haltekorridors
+  TEST_POWER_MAX: 250,              // Obere Grenze des Haltekorridors
   DANGER_POWER_LEVEL: 200,          // Katastrophenniveau — hohe Effizienz, hohe Gefahr
   XENON_STALL_POWER: 30,            // Leistungsboden bei schwerer Xenon-Vergiftung
   TEST_DURATION_SECONDS: 480,
+  HISTORICAL_START_CLOCK: "01:15:47",
+  HISTORICAL_AZ5_CLOCK: "01:23:40",
+  HISTORICAL_EXPLOSION_CLOCK: "01:23:47",
 
   // Punktkinetik (browser-tauglich, aber physikalisch deutlich naeher an echten Reaktormodellen)
   KINETICS_SUBSTEPS: 240,
@@ -26,16 +29,14 @@ export const PHYSICS = {
     { beta: 0.000273, lambda: 3.01 },
   ] as const,
   TOTAL_DELAYED_NEUTRON_FRACTION: 0.006502,
-  // Echte Iod/Xenon-Dynamik laeuft auf Stundenskala. Fuer eine 8-Minuten-Session
-  // muessen wir staerker raffen, sonst sieht der Spieler nie die Vergiftung,
-  // die Tschernobyl-Operatoren in die Falle gelockt hat.
-  POISON_TIME_SCALE: 360,
+  // Die Session startet bereits im vergifteten Niedrigleistungszustand. Iod/Xenon
+  // laufen deshalb in Echtzeit; die vorangegangenen Stunden stecken im Initialzustand.
+  POISON_TIME_SCALE: 1,
 
   // Reaktivitätsbeiträge (delta-k/k)
-  // BASE_EXCESS_REACTIVITY enthält jetzt explizit die Gleichgewichts-Xenon-Vergiftung
-  // (~−2,5 % Δk/k). Im Klartext: 0,0525 = 0,0275 „reiner" Überschuss + 0,025 Xe-Eq.
-  // → bei voller Bestrahlung mit Xe=1 bleibt netto die historisch dokumentierte Reserve.
-  BASE_EXCESS_REACTIVITY: 0.0525,
+  // BASE_EXCESS_REACTIVITY enthält die Xe-Kompensation, ist aber auf den realen
+  // Startzustand kalibriert: ~200 MW, Xe≈1,45 und OZR≈26 Stabäquivalente.
+  BASE_EXCESS_REACTIVITY: 0.041,
   TOTAL_ROD_WORTH: 0.036,
   DOPPLER_COEFFICIENT: -0.000011,
   COOLANT_DENSITY_COEFFICIENT: -0.00003,
@@ -54,9 +55,9 @@ export const PHYSICS = {
   // Xenon / Iod-135 — gekoppelte ODE in NORMALISIERTEN Einheiten:
   //   Iod- und Xenon-Konzentration werden so skaliert, dass das Gleichgewicht
   //   bei Vollast (Fluss = 1) genau 1.0 ergibt. Damit ist „Xenon = 1" das normale
-  //   Betriebsgift, „Xenon = 2…3" der Tschernobyl-typische Xenon-Pit nach
-  //   Leistungsabsenkung (≈10 h reale Zeit, hier auf Sekunden komprimiert).
-  // Yields wurden so kalibriert, dass Σ_in / Σ_out = 1 bei φ = 1, I = 1.
+  //   Betriebsgift; der Unfallstart liegt bei ca. 1,4–1,5, weil Burnup nach dem
+  //   Leistungsabfall fast wegfiel, Iod-135 aber weiter zu Xenon-135 zerfiel.
+  // Yields sind so kalibriert, dass Σ_in / Σ_out = 1 bei φ = 1, I = 1.
   // Reaktivitätsverlust pro Einheit normalisierter Xenon-Konzentration.
   // BASE_EXCESS_REACTIVITY enthält den Xe=1-Gleichgewichtsverlust bereits als
   // kritischen Referenzoffset, sodass Normal-Xenon den Startzustand nicht abwürgt.
@@ -64,15 +65,16 @@ export const PHYSICS = {
   XENON_MAX_REACTIVITY_PENALTY: 0.025,
   // Maximale physikalische Xenon-Überhöhung über Gleichgewicht (Pit ≈ 2,5–3×).
   XENON_PIT_CAP: 3.5,
-  XENON_WARNING_CONCENTRATION: 1.5,
+  XENON_WARNING_CONCENTRATION: 1.35,
   XENON_SEVERE_CONCENTRATION: 2.5,
   IODINE_DECAY_CONSTANT: Math.LN2 / (6.57 * 3600),    // λ_I  ≈ 2,93·10⁻⁵ /s
   XENON_DECAY_CONSTANT: Math.LN2 / (9.14 * 3600),     // λ_Xe ≈ 2,11·10⁻⁵ /s
   // I-Yield in normalisierten Einheiten: γ_I = λ_I → I_eq(φ=1) = 1.
   IODINE_YIELD_COEFFICIENT: Math.LN2 / (6.57 * 3600),
-  // Direct-Xe-Yield: gewählt damit Xe_eq(φ=1, I=1) = 1.
-  // Σ_in = γ_xe·φ + λ_I·I = γ_xe + λ_I ; Σ_out = λ_Xe + σφ → γ_xe = λ_Xe + σφ_full − λ_I
-  XENON_DIRECT_YIELD_COEFFICIENT: 2.51e-4,
+  // Xe-135 entsteht überwiegend aus I-135-Zerfall; direkte Spaltausbeute ist klein.
+  // Bei Vollast: direkte Quelle ≈5 %, Iod-Zerfall ≈95 % des Xe-Quellterms.
+  XENON_DIRECT_YIELD_COEFFICIENT: 1.41e-5,
+  XENON_IODINE_YIELD_COEFFICIENT: 2.67e-4,
   // σ·φ bei Vollast — realistischer Wert ~2,6·10⁻⁴ /s (σ_Xe ≈ 2,6·10⁶ b, φ ≈ 10¹⁴).
   XENON_BURNUP_COEFFICIENT: 2.6e-4,
 
@@ -138,7 +140,7 @@ export const PHYSICS = {
   AZ5_GRAPHIT_SPIKE_DURATION: 5,
   AZ5_GRAPHIT_POWER_MULTIPLIER: 2.5,
   AZ5_LOW_ORM_MULTIPLIER: 5.0,      // Verstärkter Spike wenn ORM < 15 ("un-trippable")
-  AZ5_GRAPHITE_BASE_REACTIVITY: 0.0045,
+  AZ5_GRAPHITE_BASE_REACTIVITY: 0.012,
   AZ5_GRAPHITE_LOW_ORM_REACTIVITY: 0.02,
   AZ5_GRAPHIT_POWER_THRESHOLD: 700,  // Unterhalb davon wird der Tip-Effekt relevant
   AZ5_GRAPHIT_MARGIN_THRESHOLD: 30,  // Niedrige OZR macht den positiven Scram gefaehrlich
@@ -186,8 +188,8 @@ export const PHYSICS = {
   SCORE_PENALTY_PER_ALARM: 200,
   SCORE_BONUS_TEST_SUCCESS: 3000,
   SCORE_BONUS_ECCS_DISABLED: 500,
-  SCORE_BONUS_STABLE_LOW_POWER: 1500, // Bonus fuer stabile Leistung um 700 MW
-  SCORE_BONUS_DANGER_ZONE: 20,       // Risiko-Bonus pro Tick bei ~200 MW (hohe Effizienz, hohe Gefahr)
+  SCORE_BONUS_STABLE_LOW_POWER: 1500, // Bonus fuer stabile Leistung im historischen Bereich
+  SCORE_BONUS_DANGER_ZONE: 0,        // 200 MW ist jetzt der Start-/Zielzustand, kein Zusatzbonus
 
   // Tick-Rate
   TICK_INTERVAL_MS: 500,

@@ -4,6 +4,14 @@ import { PHYSICS } from '@/lib/physics/constants';
 export type RodType = 'AZ' | 'AR' | 'RR' | 'LAR' | 'USP';
 export type ChannelType = 'fuel' | 'rod' | 'sensor' | 'absorber' | 'empty';
 export type Quadrant = 'NW' | 'NE' | 'SW' | 'SE';
+export type TemperatureZoneIndex = 0 | 1 | 2 | 3;
+
+export const TEMPERATURE_ZONE_BY_QUADRANT: Record<Quadrant, TemperatureZoneIndex> = {
+  NW: 0,
+  NE: 1,
+  SW: 2,
+  SE: 3,
+};
 
 interface Position {
   row: number;
@@ -223,6 +231,10 @@ export function getQuadrant(row: number, col: number): Quadrant {
   return 'SE';
 }
 
+export function getTemperatureZoneForQuadrant(quadrant: Quadrant): TemperatureZoneIndex {
+  return TEMPERATURE_ZONE_BY_QUADRANT[quadrant];
+}
+
 // Rod type colors for all panels
 export const ROD_COLORS: Record<RodType, string> = {
   AZ: '#ff3333',
@@ -317,18 +329,44 @@ export function getQuadrantBalance(
   return { avg, quadrants, maxDeviation };
 }
 
-// Heat zone color for mnemonic board (10-step gradient for smooth thermal display)
+// Heat zone color for mnemonic board (continuous gradient for smooth thermal display)
 export function getHeatColor(normalizedPower: number): string {
-  if (normalizedPower > 0.92) return '#ff1111';
-  if (normalizedPower > 0.82) return '#dd2200';
-  if (normalizedPower > 0.72) return '#cc4400';
-  if (normalizedPower > 0.62) return '#cc7700';
-  if (normalizedPower > 0.52) return '#aa8800';
-  if (normalizedPower > 0.42) return '#7a8a00';
-  if (normalizedPower > 0.32) return '#4a7a1a';
-  if (normalizedPower > 0.22) return '#1a7a3e';
-  if (normalizedPower > 0.12) return '#0a5a2e';
-  return '#0a3a20';
+  const stops = [
+    '#0a3a20',
+    '#0a5a2e',
+    '#1a7a3e',
+    '#4a7a1a',
+    '#7a8a00',
+    '#aa8800',
+    '#cc7700',
+    '#cc4400',
+    '#dd2200',
+    '#ff1111',
+  ];
+  const clampedPower = Math.max(0, Math.min(1, normalizedPower));
+  const scaledPower = clampedPower * (stops.length - 1);
+  const stopIndex = Math.floor(scaledPower);
+  const nextStopIndex = Math.min(stops.length - 1, stopIndex + 1);
+  const mix = scaledPower - stopIndex;
+
+  return mixHexColors(stops[stopIndex], stops[nextStopIndex], mix);
+}
+
+function mixHexColors(fromColor: string, toColor: string, mix: number): string {
+  const from = parseHexColor(fromColor);
+  const to = parseHexColor(toColor);
+  const channel = (fromValue: number, toValue: number) =>
+    Math.round(fromValue + (toValue - fromValue) * mix).toString(16).padStart(2, '0');
+
+  return `#${channel(from.r, to.r)}${channel(from.g, to.g)}${channel(from.b, to.b)}`;
+}
+
+function parseHexColor(color: string): { r: number; g: number; b: number } {
+  return {
+    r: Number.parseInt(color.slice(1, 3), 16),
+    g: Number.parseInt(color.slice(3, 5), 16),
+    b: Number.parseInt(color.slice(5, 7), 16),
+  };
 }
 
 // Neutron activity color
@@ -341,7 +379,7 @@ export function getNeutronColor(flux: number): string {
 
 // Warning region detection
 export interface CoreWarning {
-  quadrant: Quadrant;
+  quadrant?: Quadrant;
   type: 'heat' | 'neutron' | 'rod_withdrawal';
   severity: 'warning' | 'alarm';
 }
@@ -365,9 +403,9 @@ export function getCoreWarnings(
   });
 
   if (controlRods < PHYSICS.MINIMUM_SAFE_RODS) {
-    warnings.push({ quadrant: 'NW', type: 'rod_withdrawal', severity: 'alarm' });
+    warnings.push({ type: 'rod_withdrawal', severity: 'alarm' });
   } else if (controlRods < PHYSICS.OZR_WARNING) {
-    warnings.push({ quadrant: 'NW', type: 'rod_withdrawal', severity: 'warning' });
+    warnings.push({ type: 'rod_withdrawal', severity: 'warning' });
   }
 
   return warnings;

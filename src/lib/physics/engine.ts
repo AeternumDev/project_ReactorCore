@@ -59,11 +59,7 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
   let shortenedRods = state.shortenedRods;
   const safetyRods = state.safetyRods;
 
-  if (state.powerMode === "auto") {
-    const powerError = state.thermalPower - state.powerSetpoint;
-    const adjustment = Math.sign(powerError) * Math.min(Math.abs(powerError) / 500, 0.5) * DT;
-    autoRods = Math.max(0, Math.min(PHYSICS.AUTO_RODS_MAX, autoRods + adjustment));
-  }
+  ({ manualRods, autoRods } = applyPowerAutopilot(state, manualRods, autoRods, shortenedRods, safetyRods));
 
   const controlRods = manualRods + autoRods + shortenedRods + safetyRods;
   const reactivityMargin = controlRods;
@@ -94,13 +90,19 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     core.xenonConcentration
   );
 
+  const turbineConnected = state.turbineConnected;
+  let turbineValveOpen = state.turbineValveOpen;
+  if (state.turbineAuto) {
+    turbineValveOpen = calculateAutoTurbineValve(state, steamPressure);
+  }
+
   let turbineSpeed = state.turbineSpeed;
   let generatorOutput = state.generatorOutput;
 
-  if (state.turbineConnected && state.turbineValveOpen > 0) {
+  if (turbineConnected && turbineValveOpen > 0) {
     const steamDrive =
       (steamPressure / PHYSICS.STEAM_PRESSURE_NOMINAL) *
-      (state.turbineValveOpen / 100) *
+      (turbineValveOpen / 100) *
       PHYSICS.TURBINE_NOMINAL_SPEED;
     turbineSpeed += (steamDrive - turbineSpeed) * 0.05 * DT;
   } else {
@@ -108,20 +110,23 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
   }
   turbineSpeed = Math.max(0, Math.min(PHYSICS.TURBINE_MAX_SPEED, turbineSpeed));
 
-  if (state.turbineConnected && turbineSpeed > 500) {
+  if (turbineConnected && turbineSpeed > 500) {
     generatorOutput =
       thermalPower *
       PHYSICS.TURBINE_EFFICIENCY *
       (turbineSpeed / PHYSICS.TURBINE_NOMINAL_SPEED) *
-      (state.turbineValveOpen / 100);
+      (turbineValveOpen / 100);
   } else {
     generatorOutput = Math.max(0, generatorOutput - 20 * DT);
   }
   generatorOutput = Math.max(0, generatorOutput);
 
   let drumSeparatorLevel = state.drumSeparatorLevel;
-  const steamOutRate = core.steamVoidFraction * 5;
-  const waterInRate = state.feedWaterFlow / PHYSICS.FEED_WATER_NOMINAL;
+  const feedWaterFlow = state.feedWaterAuto
+    ? calculateAutoFeedWaterFlow(state, thermalPower, core.steamVoidFraction)
+    : state.feedWaterFlow;
+  const steamOutRate = calculateDrumSteamOutRate(thermalPower, core.steamVoidFraction);
+  const waterInRate = feedWaterFlow / PHYSICS.FEED_WATER_NOMINAL;
   drumSeparatorLevel += (waterInRate - steamOutRate - 0.5) * DT * 2;
   drumSeparatorLevel = clamp(drumSeparatorLevel, 0, 100);
 
@@ -138,7 +143,7 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
       addEventIfNew(
         events,
         elapsed,
-        `BAZ AUSGELÖST — Wärmeleistung ${Math.round(thermalPower)} MW, Druck ${steamPressure.toFixed(1)} MPa, Durchfluss ${Math.round(coolantFlowRate)} m³/h`,
+        `BAZ AUSGELÖST — Wärmeleistung ${Math.round(thermalPower)} MW, Druck ${steamPressure.toFixed(1)} bar, Durchfluss ${Math.round(coolantFlowRate)} m³/h`,
         "critical",
         "baz-triggered",
       );
@@ -196,7 +201,7 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     addEventIfNew(
       events,
       elapsed,
-      `DRUCKROHRVERSAGEN — Dampfdruck ${steamPressure.toFixed(1)} MPa, Dampfexplosion`,
+      `DRUCKROHRVERSAGEN — Dampfdruck ${steamPressure.toFixed(1)} bar, Dampfexplosion`,
       "alarm",
       "pressure-explosion",
     );
@@ -265,7 +270,7 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     addEventIfNew(
       events,
       elapsed,
-      `DAMPFDRUCK ERHÖHT — ${steamPressure.toFixed(1)} MPa (Warngrenze ${PHYSICS.STEAM_PRESSURE_WARNING} MPa)`,
+      `DAMPFDRUCK ERHÖHT — ${steamPressure.toFixed(1)} bar (Warngrenze ${PHYSICS.STEAM_PRESSURE_WARNING} bar)`,
       "warning",
       "steam-pressure",
     );
@@ -278,6 +283,16 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
       `DAMPFBLASENANTEIL KRITISCH — ${(core.steamVoidFraction * 100).toFixed(0)} % Hohlraumanteil`,
       "warning",
       "void",
+    );
+  }
+
+  if (Math.min(state.thermalPower, thermalPower) <= PHYSICS.XENON_STALL_POWER && !state.az5Active) {
+    addEventIfNew(
+      events,
+      elapsed,
+      `REAKTOR GESTALLT — Wärmeleistung ${Math.round(thermalPower)} MW, Betriebsvorschrift erwartet AZ-5`,
+      "critical",
+      "reactor-stalled-az5",
     );
   }
 
@@ -359,8 +374,11 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     safetyRods: newSafetyRods,
     reactivityMargin: finalControlRods,
     turbineSpeed,
+    turbineConnected,
+    turbineValveOpen,
     generatorOutput,
     drumSeparatorLevel,
+    feedWaterFlow,
     bazTriggered,
     bazArmed,
     activeCoolantPumps: liveActivePumps,
@@ -458,6 +476,94 @@ function clamp01(value: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function applyPowerAutopilot(
+  state: ReactorState,
+  manualRods: number,
+  autoRods: number,
+  shortenedRods: number,
+  safetyRods: number,
+): Pick<ReactorState, 'manualRods' | 'autoRods'> {
+  if (state.powerMode !== "auto") {
+    return { manualRods, autoRods };
+  }
+
+  const powerError = state.thermalPower - state.powerSetpoint;
+  const powerTrend = state.thermalPower - state.lastPowerLevel;
+  const dampedError = powerError + powerTrend * 0.6;
+  if (Math.abs(dampedError) < 3) {
+    return { manualRods, autoRods };
+  }
+
+  const rodStep = Math.min(Math.abs(dampedError) / 90, 1.2) * DT;
+  const totalRods = manualRods + autoRods + shortenedRods + safetyRods;
+
+  if (dampedError > 0) {
+    const autoHeadroom = PHYSICS.AUTO_RODS_MAX - autoRods;
+    const autoInsertion = Math.min(autoHeadroom, rodStep);
+    autoRods += autoInsertion;
+
+    const remaining = rodStep - autoInsertion;
+    if (remaining > 0) {
+      manualRods = Math.min(PHYSICS.MANUAL_RODS_MAX, manualRods + remaining * 0.7);
+    }
+  } else {
+    const autoWithdrawal = Math.min(autoRods, rodStep);
+    autoRods -= autoWithdrawal;
+
+    const remaining = rodStep - autoWithdrawal;
+    const protectedRods = PHYSICS.OZR_MINIMUM_SAFE + 1;
+    const withdrawableManualRods = Math.max(0, totalRods - protectedRods - autoWithdrawal);
+    if (remaining > 0 && withdrawableManualRods > 0) {
+      manualRods = Math.max(0, manualRods - Math.min(withdrawableManualRods, remaining * 0.6));
+    }
+  }
+
+  return { manualRods, autoRods };
+}
+
+function calculateAutoTurbineValve(state: ReactorState, steamPressure: number): number {
+  if (!state.turbineConnected) {
+    const closeStep = 24 * DT;
+    return clamp(state.turbineValveOpen - closeStep, 0, 100);
+  }
+
+  const speedError = PHYSICS.TURBINE_NOMINAL_SPEED - state.turbineSpeed;
+  const pressureError = steamPressure - PHYSICS.STEAM_PRESSURE_NOMINAL;
+  const overspeedClose = state.turbineSpeed > PHYSICS.TURBINE_NOMINAL_SPEED * 1.03;
+  const targetValve = overspeedClose
+    ? 0
+    : clamp(68 + speedError / 45 + pressureError * 1.6, 0, 100);
+  const maxValveStep = 16 * DT;
+  return clamp(
+    state.turbineValveOpen + clamp(targetValve - state.turbineValveOpen, -maxValveStep, maxValveStep),
+    0,
+    100,
+  );
+}
+
+function calculateAutoFeedWaterFlow(
+  state: ReactorState,
+  thermalPower: number,
+  steamVoidFraction: number,
+): number {
+  const levelError = PHYSICS.DRUM_LEVEL_NOMINAL - state.drumSeparatorLevel;
+  const steamOutRate = calculateDrumSteamOutRate(thermalPower, steamVoidFraction);
+  const steadyFlow = (0.5 + steamOutRate) * PHYSICS.FEED_WATER_NOMINAL;
+  const targetFlow = clamp(steadyFlow + levelError * 12, 0, 1000);
+  const maxFlowStep = 120 * DT;
+  return clamp(
+    state.feedWaterFlow + clamp(targetFlow - state.feedWaterFlow, -maxFlowStep, maxFlowStep),
+    0,
+    1000,
+  );
+}
+
+function calculateDrumSteamOutRate(thermalPower: number, steamVoidFraction: number): number {
+  const powerSteamDemand = 0.5 * clamp(thermalPower / PHYSICS.TEST_POWER_TARGET, 0, 6);
+  const voidSwellDemand = steamVoidFraction * 3.2;
+  return clamp(powerSteamDemand + voidSwellDemand, 0, 5.5);
 }
 
 /**
@@ -616,7 +722,7 @@ function integrateCoreDynamics(state: ReactorState, control: CoreControlState): 
     const xenonDot =
       poisonScale *
       (PHYSICS.XENON_DIRECT_YIELD_COEFFICIENT * core.neutronFlux +
-        PHYSICS.IODINE_DECAY_CONSTANT * core.iodineConcentration -
+        PHYSICS.XENON_IODINE_YIELD_COEFFICIENT * core.iodineConcentration -
         PHYSICS.XENON_DECAY_CONSTANT * core.xenonConcentration -
         PHYSICS.XENON_BURNUP_COEFFICIENT * core.neutronFlux * core.xenonConcentration);
 

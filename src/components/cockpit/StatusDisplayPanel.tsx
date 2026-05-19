@@ -111,22 +111,28 @@ export default function StatusDisplayPanel({
 
   // --- Operator guidance ---
   function getGuidanceMessage(): { text: string; color: string } {
+    if (thermalPower <= PHYSICS.XENON_STALL_POWER) {
+      return { text: `REAKTOR GESTALLT — VORSCHRIFT ERWARTET AZ-5`, color: 'var(--alarm-red)' };
+    }
     if (thermalPower < PHYSICS.TEST_POWER_MIN) {
       if (xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION) {
-        return { text: 'LEISTUNG ZU NIEDRIG — XENON-PIT → MR AUSFAHREN, USP PRÜFEN', color: 'var(--warning-yellow)' };
+        return { text: `LEISTUNG UNTER ${PHYSICS.TEST_POWER_TARGET} MW — XENON HOCH, MR NUR SCHRITTWEISE AUSFAHREN`, color: 'var(--warning-yellow)' };
       }
-      return { text: 'LEISTUNG UNTER 700 MW — MR-STÄBE AUSFAHREN', color: 'var(--warning-yellow)' };
+      return { text: `LEISTUNG UNTER ${PHYSICS.TEST_POWER_TARGET} MW — MR-STÄBE VORSICHTIG AUSFAHREN`, color: 'var(--warning-yellow)' };
     }
     if (thermalPower > PHYSICS.TEST_POWER_MAX) {
-      return { text: 'LEISTUNG ÜBER 700 MW — MR-STÄBE EINFAHREN', color: 'var(--warning-yellow)' };
+      return { text: `LEISTUNG ÜBER ${PHYSICS.TEST_POWER_TARGET} MW — MR-STÄBE EINFAHREN`, color: 'var(--warning-yellow)' };
     }
-    if (xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION) {
-      return { text: 'ZIEL 700 MW — XENON-PIT → STABPOSITION BEOBACHTEN', color: 'var(--safe-green)' };
+    if (xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION && reactivityMargin < PHYSICS.OZR_WARNING) {
+      return { text: `ZIEL ${PHYSICS.TEST_POWER_TARGET} MW — XENON UND OZR IM WARNBEREICH`, color: 'var(--warning-yellow)' };
     }
     if (reactivityMargin < PHYSICS.OZR_WARNING) {
-      return { text: 'ZIEL 700 MW — OZR NIEDRIG → STABMANAGEMENT ERFORDERLICH', color: 'var(--warning-yellow)' };
+      return { text: `ZIEL ${PHYSICS.TEST_POWER_TARGET} MW — OZR NIEDRIG, WEITERE AUSFAHRT VERMEIDEN`, color: 'var(--warning-yellow)' };
     }
-    return { text: 'ZIEL 700 MW — LEISTUNG STABIL — ZUSTAND HALTEN', color: 'var(--safe-green)' };
+    if (xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION) {
+      return { text: `ZIEL ${PHYSICS.TEST_POWER_TARGET} MW — XENON HOCH, STABPOSITION BEOBACHTEN`, color: 'var(--warning-yellow)' };
+    }
+    return { text: `ZIEL ${PHYSICS.TEST_POWER_TARGET} MW — LEISTUNG STABIL — ZUSTAND HALTEN`, color: 'var(--safe-green)' };
   }
 
   const guidance = getGuidanceMessage();

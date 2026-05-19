@@ -45,8 +45,8 @@ const CHECKLIST: ChecklistItem[] = [
   {
     id: 'power-band',
     step: '01',
-    title: 'LEISTUNG IN DEN VERSUCHSBEREICH BRINGEN',
-    instruction: `Reaktorleistung auf ${PHYSICS.TEST_POWER_TARGET} MW(th) absenken.`,
+    title: 'NIEDRIGLEISTUNGS-ZUSTAND BESTÄTIGEN',
+    instruction: `Reaktorleistung im historischen Bereich um ${PHYSICS.TEST_POWER_TARGET} MW(th) halten.`,
     check: (context) => (
       context.thermalPower >= PHYSICS.TEST_POWER_MIN &&
       context.thermalPower <= PHYSICS.TEST_POWER_MAX
@@ -56,7 +56,7 @@ const CHECKLIST: ChecklistItem[] = [
     id: 'power-hold',
     step: '02',
     title: 'LEISTUNG STABIL HALTEN',
-    instruction: `Leistung ${POWER_HOLD_SECONDS} Sekunden durchgehend nahe ${PHYSICS.TEST_POWER_TARGET} MW(th) halten.`,
+    instruction: `Leistung ${POWER_HOLD_SECONDS} Sekunden durchgehend nahe ${PHYSICS.TEST_POWER_TARGET} MW(th) halten; keine grossen Stabspruenge.`,
     check: (context) => context.stablePowerSeconds >= POWER_HOLD_SECONDS,
   },
   {
@@ -95,8 +95,8 @@ const CHECKLIST: ChecklistItem[] = [
     id: 'safety-override',
     step: '06',
     title: 'SCHUTZBLOCKIERUNG UND OZR PRÜFEN',
-    instruction: `BAZ-Blockierung bestätigt und OZR mindestens ${PHYSICS.OZR_WARNING} Stabäquivalente vor Versuchsbeginn halten.`,
-    check: (context) => !context.bazArmed && context.reactivityMargin >= PHYSICS.OZR_WARNING,
+    instruction: `BAZ-Blockierung bestätigt; OZR muss oberhalb ${PHYSICS.OZR_MINIMUM_SAFE} Stabäquivalente bleiben, unter ${PHYSICS.OZR_WARNING} ist bereits Warnbereich.`,
+    check: (context) => !context.bazArmed && context.reactivityMargin >= PHYSICS.OZR_MINIMUM_SAFE,
   },
   {
     id: 'begin-rundown',

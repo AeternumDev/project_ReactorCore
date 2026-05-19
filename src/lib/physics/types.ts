@@ -28,12 +28,14 @@ export interface ReactorState {
   // Turbine und Generator
   turbineConnected: boolean;
   turbineValveOpen: number;   // 0-100 (%)
+  turbineAuto: boolean;
   turbineSpeed: number;       // RPM (nominal ~3000)
   generatorOutput: number;    // MW elektrisch
 
   // Trommelabscheider
   drumSeparatorLevel: number; // % Wasserstand (nominal ~50)
   feedWaterFlow: number;      // L/s
+  feedWaterAuto: boolean;
 
   // Leistungsregelung
   powerMode: 'manual' | 'auto';
@@ -106,8 +108,10 @@ export type GameAction =
   | { type: 'TOGGLE_BAZ' }
   | { type: 'TRIGGER_BAZ' }
   | { type: 'TOGGLE_TURBINE' }
+  | { type: 'TOGGLE_TURBINE_AUTO' }
   | { type: 'SET_TURBINE_VALVE'; payload: number }
   | { type: 'SET_FEED_WATER'; payload: number }
+  | { type: 'TOGGLE_FEED_WATER_AUTO' }
   | { type: 'SET_POWER_MODE'; payload: 'manual' | 'auto' }
   | { type: 'SET_POWER_SETPOINT'; payload: number }
   | { type: 'START_GAME' }

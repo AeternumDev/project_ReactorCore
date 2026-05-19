@@ -2,13 +2,16 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import InfoTooltip from './InfoTooltip';
+import { PHYSICS } from '@/lib/physics/constants';
 
 interface AZ5ButtonProps {
   az5Active: boolean;
+  thermalPower: number;
+  reactivityMargin: number;
   dispatch: React.Dispatch<{ type: 'TRIGGER_AZ5' }>;
 }
 
-export default function AZ5Button({ az5Active, dispatch }: AZ5ButtonProps) {
+export default function AZ5Button({ az5Active, thermalPower, reactivityMargin, dispatch }: AZ5ButtonProps) {
   const [capOpen, setCapOpen] = useState(false);
   const [holdProgress, setHoldProgress] = useState(0);
   const holdTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -21,6 +24,8 @@ export default function AZ5Button({ az5Active, dispatch }: AZ5ButtonProps) {
       dispatch({ type: 'TRIGGER_AZ5' });
     }
   }, [holdProgress, dispatch]);
+
+  const reactorStalled = thermalPower <= PHYSICS.XENON_STALL_POWER && !az5Active;
 
   const startHold = useCallback(() => {
     if (az5Active) return;
@@ -83,6 +88,25 @@ bevor die Absorption greift — der sogenannte "Tip-Effekt".
 Nur im absoluten Notfall verwenden!`} />
         </span>
       </div>
+
+      {reactorStalled && (
+        <div
+          className="animate-blink"
+          style={{
+            border: '1px solid var(--warning-yellow)',
+            background: 'rgba(255, 215, 0, 0.08)',
+            color: 'var(--warning-yellow)',
+            fontFamily: 'var(--font-share-tech-mono), monospace',
+            fontSize: '0.72rem',
+            lineHeight: 1.35,
+            padding: '6px 8px',
+            marginBottom: '8px',
+          }}
+        >
+          REAKTOR GESTALLT ({Math.round(thermalPower)} MW) — VORSCHRIFT: AZ-5 AUSLÖSEN
+          <br />OZR: {reactivityMargin} STABÄQUIV.
+        </div>
+      )}
 
       <div style={{ position: 'relative' }}>
         {/* Safety cap */}

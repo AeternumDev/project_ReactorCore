@@ -3,7 +3,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import {
   CHANNELS, CORE_GRID, CORE_RADIUS, ROD_COLORS, ChannelInfo,
-  getHeatColor, getNeutronColor, getCoreWarnings, Quadrant,
+  getHeatColor, getNeutronColor, getCoreWarnings, getTemperatureZoneForQuadrant, Quadrant,
 } from './coreLayout';
 import { PHYSICS } from '@/lib/physics/constants';
 import { GameAction } from '@/lib/physics/types';
@@ -29,8 +29,33 @@ type ViewMode = 'heat' | 'neutron' | 'rods';
 
 const CELL_PX = 6;
 const GAP_PX = 1;
-const CELL_TOTAL = CELL_PX + GAP_PX;
-const TOTAL_PX = CORE_GRID * CELL_TOTAL;
+const CELL_STRIDE_PX = CELL_PX + GAP_PX;
+const TOTAL_PX = CORE_GRID * CELL_PX + (CORE_GRID - 1) * GAP_PX;
+const MIDLINE_PX = TOTAL_PX / 2;
+
+function lerp(from: number, to: number, mix: number): number {
+  return from + (to - from) * mix;
+}
+
+function getBlendedCoreTemperature(
+  channel: ChannelInfo,
+  coreTemperatureZones: [number, number, number, number],
+): number {
+  const xMix = (channel.col + 0.5) / CORE_GRID;
+  const yMix = (channel.row + 0.5) / CORE_GRID;
+  const north = lerp(
+    coreTemperatureZones[getTemperatureZoneForQuadrant('NW')],
+    coreTemperatureZones[getTemperatureZoneForQuadrant('NE')],
+    xMix,
+  );
+  const south = lerp(
+    coreTemperatureZones[getTemperatureZoneForQuadrant('SW')],
+    coreTemperatureZones[getTemperatureZoneForQuadrant('SE')],
+    xMix,
+  );
+
+  return lerp(north, south, yMix);
+}
 
 function getChannelHeatColor(
   channel: ChannelInfo,
@@ -38,9 +63,7 @@ function getChannelHeatColor(
   isExploded: boolean,
 ): string {
   if (isExploded) return '#331100';
-  const qIdx = channel.quadrant === 'NW' ? 0 : channel.quadrant === 'NE' ? 1 :
-    channel.quadrant === 'SW' ? 2 : 3;
-  const baseTemp = coreTemperatureZones[qIdx];
+  const baseTemp = getBlendedCoreTemperature(channel, coreTemperatureZones);
 
   // Radial gradient: core center hotter, periphery cooler (cosine neutron flux profile)
   const center = CORE_GRID / 2;
@@ -53,7 +76,9 @@ function getChannelHeatColor(
   const rodFactor = channel.channelType === 'rod' ? 0.85 : 1.0;
 
   // Deterministic micro-variation for visual texture
-  const variation = 1.0 + 0.06 * Math.sin(channel.row * 3.7 + channel.col * 2.3);
+  const variation = 1.0
+    + 0.025 * Math.sin(channel.row * 1.31 + channel.col * 2.17)
+    + 0.015 * Math.cos(channel.row * 0.73 - channel.col * 1.91);
 
   const adjustedTemp = baseTemp * radialFactor * rodFactor * variation;
 
@@ -162,6 +187,7 @@ export default function MnemonicBoard({
   const warningQuadrants = useMemo(() => {
     const result: Record<Quadrant, { color: string } | null> = { NW: null, NE: null, SW: null, SE: null };
     warnings.forEach(w => {
+      if (!w.quadrant) return;
       const color = w.severity === 'alarm' ? 'rgba(255,32,32,0.15)' : 'rgba(255,200,0,0.10)';
       result[w.quadrant] = { color };
     });
@@ -169,12 +195,13 @@ export default function MnemonicBoard({
   }, [warnings]);
 
   const quadrantRects = useMemo(() => {
-    const half = TOTAL_PX / 2;
+    const half = MIDLINE_PX;
+    const remainder = TOTAL_PX - half;
     return {
       NW: { x: 0, y: 0, w: half, h: half },
-      NE: { x: half, y: 0, w: half, h: half },
-      SW: { x: 0, y: half, w: half, h: half },
-      SE: { x: half, y: half, w: half, h: half },
+      NE: { x: half, y: 0, w: remainder, h: half },
+      SW: { x: 0, y: half, w: half, h: remainder },
+      SE: { x: half, y: half, w: remainder, h: remainder },
     };
   }, []);
 
@@ -265,8 +292,8 @@ export default function MnemonicBoard({
 
           {/* Channel cells */}
           {CHANNELS.map((ch, i) => {
-            const x = ch.col * CELL_TOTAL;
-            const y = ch.row * CELL_TOTAL;
+            const x = ch.col * CELL_STRIDE_PX;
+            const y = ch.row * CELL_STRIDE_PX;
 
             let fill: string;
             let opacity = 0.8;
@@ -315,12 +342,6 @@ export default function MnemonicBoard({
               />
             );
           })}
-
-          {/* Quadrant dividers */}
-          <line x1={TOTAL_PX / 2} y1={0} x2={TOTAL_PX / 2} y2={TOTAL_PX}
-            stroke="#333" strokeWidth="0.5" />
-          <line x1={0} y1={TOTAL_PX / 2} x2={TOTAL_PX} y2={TOTAL_PX / 2}
-            stroke="#333" strokeWidth="0.5" />
         </svg>
       </div>
 

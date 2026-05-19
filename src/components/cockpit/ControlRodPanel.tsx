@@ -24,7 +24,7 @@ type Phase = 'startup' | 'stabilize' | 'xenon_recovery' | 'power_descent' | 'ste
 
 function getPhase(thermalPower: number, xenon: number, ozr: number, elapsed: number): Phase {
   if (ozr < PHYSICS.OZR_MINIMUM_SAFE) return 'critical';
-  if (xenon > 1.5 && thermalPower < PHYSICS.TEST_POWER_MIN) return 'xenon_recovery';
+  if (xenon > PHYSICS.XENON_WARNING_CONCENTRATION && thermalPower < PHYSICS.TEST_POWER_MIN) return 'xenon_recovery';
   if (thermalPower < PHYSICS.TEST_POWER_MIN && elapsed < 60) return 'startup';
   if (thermalPower < PHYSICS.TEST_POWER_MIN) return 'power_descent';
   if (thermalPower > PHYSICS.TEST_POWER_MAX) return 'power_descent';

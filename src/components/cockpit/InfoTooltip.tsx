@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 
 interface InfoTooltipProps {
   text: string;
@@ -12,18 +12,19 @@ export default function InfoTooltip({ text }: InfoTooltipProps) {
   const iconRef = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (visible && iconRef.current) {
+  function showTooltip() {
+    if (iconRef.current) {
       const rect = iconRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
       setPosition(spaceBelow < 160 ? 'above' : 'below');
     }
-  }, [visible]);
+    setVisible(true);
+  }
 
   return (
     <span
       ref={iconRef}
-      onMouseEnter={() => setVisible(true)}
+      onMouseEnter={showTooltip}
       onMouseLeave={() => setVisible(false)}
       style={{
         position: 'relative',

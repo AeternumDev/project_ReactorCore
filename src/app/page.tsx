@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { PHYSICS } from '@/lib/physics/constants';
 
 export default function Home() {
   const router = useRouter();
@@ -70,7 +71,7 @@ export default function Home() {
           className="text-sm tracking-widest mb-6 opacity-70"
           style={{ fontFamily: 'var(--font-share-tech-mono), monospace', color: 'var(--amber)' }}
         >
-          TSCHERNOBYL-SIMULATION | 26. APRIL 1986 | 01:23 UHR
+          TSCHERNOBYL-SIMULATION | 26. APRIL 1986 | START {PHYSICS.HISTORICAL_START_CLOCK ?? '01:15:47'}
         </p>
 
         {/* Procedural briefing */}
@@ -92,38 +93,40 @@ export default function Home() {
 
           <p style={{ marginBottom: '8px' }}>
             <span style={{ color: 'var(--warning-yellow)' }}>AUSGANGSLAGE:</span>{' '}
-            Der Reaktor läuft bei 1500&nbsp;MW thermisch und wird auf 700&nbsp;MW heruntergefahren.
-            Beim Absenken der Leistung wird sich Xenon-135 im Kern akkumulieren
-            und die Kettenreaktion bremsen. OZR (Operativer Reaktivitätsvorrat)
-            ist noch im sicheren Bereich.
+            Die Simulation beginnt acht Minuten vor der Explosion. Reaktor 4 läuft nicht mehr im
+            geplanten 700&nbsp;MW-Testbereich, sondern bereits im historisch erreichten Niedrigleistungszustand
+            um <strong style={{ color: '#fff' }}>{PHYSICS.TEST_POWER_TARGET}&nbsp;MW</strong>. Die vorangegangene
+            Leistungsabsenkung steckt schon im Kern: Xenon-135 ist hoch, Iod-135 fällt ab, und der OZR
+            liegt nur noch im Warnbereich.
           </p>
 
           <p style={{ marginBottom: '8px' }}>
             <span style={{ color: 'var(--amber)' }}>ZIEL:</span>{' '}
-            Stabilisiere die Leistung bei <strong style={{ color: '#fff' }}>700&nbsp;MW</strong> und
-            halte sie dort, während der Turbinen-Auslauftest durchgeführt wird.
+            Halte den Reaktor im Bereich von <strong style={{ color: '#fff' }}>{PHYSICS.TEST_POWER_MIN}–{PHYSICS.TEST_POWER_MAX}&nbsp;MW</strong>,
+            ohne den OZR unter die Abschaltgrenze zu ziehen. TG-8 läuft noch; der Auslauf beginnt erst,
+            wenn die Dampfzufuhr geschlossen und der Rundown-Bus auf TG-8 gelegt wird.
           </p>
 
           <div style={{ marginBottom: '8px' }}>
             <span style={{ color: 'var(--amber)' }}>ERSTE MASSNAHMEN:</span>
             <ol style={{ paddingLeft: '18px', marginTop: '4px' }}>
-              <li>MR-Stäbe (Handregler) vorsichtig ausfahren, um Xenon-Vergiftung auszugleichen.</li>
-              <li>USP-Kurzabsorber bei Bedarf nachjustieren.</li>
-              <li>OZR-Anzeige beobachten — <span style={{ color: 'var(--alarm-red)' }}>unter 15 Stäben OZR: kritische Grenze!</span></li>
-              <li>Leistung langsam stabilisieren, nicht sprunghaft anpassen.</li>
+              <li>Leistung bei etwa {PHYSICS.TEST_POWER_TARGET}&nbsp;MW stabil halten; keine sprunghaften Stabbewegungen.</li>
+              <li>OZR-Anzeige beobachten — <span style={{ color: 'var(--alarm-red)' }}>unter {PHYSICS.OZR_MINIMUM_SAFE} Stäben OZR: Abschaltgrenze.</span></li>
+              <li>SAOR/ECCS und BAZ-Blockierung als historische Testkonfiguration erkennen, nicht als akute Startkatastrophe.</li>
+              <li>Vor dem Auslauf TG-8, Speisewasser, Trommelstand und Kühlfluss prüfen.</li>
             </ol>
           </div>
 
           <p style={{ marginBottom: '8px' }}>
             <span style={{ color: 'var(--alarm-red)' }}>WARNUNG (OZR):</span>{' '}
-            Sinkt der OZR unter 15&nbsp;Stäbe, ist die Kontrolle über die Kettenreaktion
+            Sinkt der OZR unter {PHYSICS.OZR_MINIMUM_SAFE}&nbsp;Stäbe, ist die Kontrolle über die Kettenreaktion
             nicht mehr gewährleistet. Die Vorschrift verlangt die sofortige Abschaltung.
           </p>
 
           <p>
             <span style={{ color: 'var(--safe-green)' }}>ERFOLG:</span>{' '}
-            Stabile Leistung bei 700&nbsp;MW über die gesamte Testdauer.
-            Xenon-Vergiftung unter Kontrolle. Kein Auslösen der Notabschaltung (AZ-5) nötig.
+            Acht Minuten Echtzeit ohne Leistungsdurchgang, Dampfblasen-Eskalation oder OZR-Verlust.
+            Die historische Falle ist bereits aufgebaut; die Aufgabe ist, sie nicht auszulösen.
           </p>
         </div>
 

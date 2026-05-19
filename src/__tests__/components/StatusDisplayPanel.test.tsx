@@ -35,31 +35,31 @@ describe('StatusDisplayPanel', () => {
     render(<StatusDisplayPanel {...baseProps} {...overrides} />);
   }
 
-  it('renders the historical 700 MW target and equilibrium xenon display', () => {
+  it('renders the historical 200 MW target and equilibrium xenon display', () => {
     renderPanel();
 
-    expect(screen.getByText('ZIEL: 700 MW (TOLERANZ +/-50 MW)')).toBeInTheDocument();
-    expect(screen.getByText('700 MW')).toHaveStyle({ color: 'var(--safe-green)' });
+    expect(screen.getByText('ZIEL: 200 MW (TOLERANZ +/-50 MW)')).toBeInTheDocument();
+    expect(screen.getByText('200 MW')).toHaveStyle({ color: 'var(--safe-green)' });
     expect(screen.getByText('100%')).toHaveStyle({ color: 'var(--amber)' });
-    expect(screen.getByText('ZIEL 700 MW — LEISTUNG STABIL — ZUSTAND HALTEN')).toHaveStyle({
+    expect(screen.getByText('ZIEL 200 MW — LEISTUNG STABIL — ZUSTAND HALTEN')).toHaveStyle({
       color: 'var(--safe-green)',
     });
   });
 
-  it('warns when power is below the 700 MW hold window', () => {
-    renderPanel({ thermalPower: 500 });
+  it('warns when power is below the historical hold window', () => {
+    renderPanel({ thermalPower: 125 });
 
-    expect(screen.getByText('500 MW')).toHaveStyle({ color: 'var(--warning-yellow)' });
-    expect(screen.getByText('LEISTUNG UNTER 700 MW — MR-STÄBE AUSFAHREN')).toHaveStyle({
+    expect(screen.getByText('125 MW')).toHaveStyle({ color: 'var(--warning-yellow)' });
+    expect(screen.getByText('LEISTUNG UNTER 200 MW — MR-STÄBE VORSICHTIG AUSFAHREN')).toHaveStyle({
       color: 'var(--warning-yellow)',
     });
   });
 
-  it('warns when power exceeds the 700 MW hold window', () => {
-    renderPanel({ thermalPower: 800 });
+  it('warns when power exceeds the historical hold window', () => {
+    renderPanel({ thermalPower: 300 });
 
-    expect(screen.getByText('800 MW')).toHaveStyle({ color: 'var(--warning-yellow)' });
-    expect(screen.getByText('LEISTUNG ÜBER 700 MW — MR-STÄBE EINFAHREN')).toHaveStyle({
+    expect(screen.getByText('300 MW')).toHaveStyle({ color: 'var(--warning-yellow)' });
+    expect(screen.getByText('LEISTUNG ÜBER 200 MW — MR-STÄBE EINFAHREN')).toHaveStyle({
       color: 'var(--warning-yellow)',
     });
   });
@@ -67,9 +67,9 @@ describe('StatusDisplayPanel', () => {
   it('uses shared xenon thresholds for pit warning colors', () => {
     renderPanel({ xenonConcentration: PHYSICS.XENON_WARNING_CONCENTRATION + 0.01 });
 
-    expect(screen.getByText('151%')).toHaveStyle({ color: 'var(--warning-yellow)' });
-    expect(screen.getByText('ZIEL 700 MW — XENON-PIT → STABPOSITION BEOBACHTEN')).toHaveStyle({
-      color: 'var(--safe-green)',
+    expect(screen.getByText('136%')).toHaveStyle({ color: 'var(--warning-yellow)' });
+    expect(screen.getByText('ZIEL 200 MW — XENON HOCH, STABPOSITION BEOBACHTEN')).toHaveStyle({
+      color: 'var(--warning-yellow)',
     });
   });
 
@@ -77,5 +77,13 @@ describe('StatusDisplayPanel', () => {
     renderPanel({ elapsedSeconds: PHYSICS.TEST_DURATION_SECONDS - 30 });
 
     expect(screen.getByText('07:30')).toHaveClass('animate-blink');
+  });
+
+  it('shows the AZ-5 procedure warning when the reactor is stalled', () => {
+    renderPanel({ thermalPower: PHYSICS.XENON_STALL_POWER });
+
+    expect(screen.getByText('REAKTOR GESTALLT — VORSCHRIFT ERWARTET AZ-5')).toHaveStyle({
+      color: 'var(--alarm-red)',
+    });
   });
 });

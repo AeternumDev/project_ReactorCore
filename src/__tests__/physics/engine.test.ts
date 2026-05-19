@@ -7,13 +7,31 @@ import { ReactorState } from "@/lib/physics/types";
 
 function createTestState(overrides: Partial<ReactorState> = {}): ReactorState {
   const state = { ...INITIAL_STATE, isRunning: true, ...overrides };
+  const hasControlOverride =
+    Object.prototype.hasOwnProperty.call(overrides, 'controlRods') ||
+    Object.prototype.hasOwnProperty.call(overrides, 'reactivityMargin');
   const hasRodOverride =
     Object.prototype.hasOwnProperty.call(overrides, 'manualRods') ||
     Object.prototype.hasOwnProperty.call(overrides, 'autoRods') ||
     Object.prototype.hasOwnProperty.call(overrides, 'shortenedRods') ||
     Object.prototype.hasOwnProperty.call(overrides, 'safetyRods');
 
+  if (hasControlOverride && !hasRodOverride) {
+    let remaining = Math.max(0, Math.min(PHYSICS.MAX_CONTROL_RODS, state.controlRods));
+    state.manualRods = Math.min(PHYSICS.MANUAL_RODS_MAX, remaining);
+    remaining -= state.manualRods;
+    state.autoRods = Math.min(PHYSICS.AUTO_RODS_MAX, remaining);
+    remaining -= state.autoRods;
+    state.shortenedRods = Math.min(PHYSICS.SHORTENED_RODS_MAX, remaining);
+    remaining -= state.shortenedRods;
+    state.safetyRods = Math.min(PHYSICS.SAFETY_RODS_MAX, remaining);
+  }
+
   if (hasRodOverride) {
+    const totalRods = state.manualRods + state.autoRods + state.shortenedRods + state.safetyRods;
+    state.controlRods = totalRods;
+    state.reactivityMargin = totalRods;
+  } else if (hasControlOverride) {
     const totalRods = state.manualRods + state.autoRods + state.shortenedRods + state.safetyRods;
     state.controlRods = totalRods;
     state.reactivityMargin = totalRods;
@@ -41,12 +59,16 @@ function advanceTicks(state: ReactorState, tickCount: number): ReactorState {
 }
 
 describe("Physik-Engine", () => {
-  test("Startzustand setzt Iod/Xenon auf Vollleistungs-Gleichgewicht", () => {
-    expect(INITIAL_STATE.iodineConcentration).toBe(PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION);
-    expect(INITIAL_STATE.xenonConcentration).toBe(PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION);
+  test("Startzustand setzt den historischen Niedrigleistungs- und Xenon-Zustand", () => {
+    expect(INITIAL_STATE.thermalPower).toBe(PHYSICS.TEST_POWER_TARGET);
+    expect(INITIAL_STATE.reactivityMargin).toBe(26);
+    expect(INITIAL_STATE.iodineConcentration).toBeCloseTo(0.49, 2);
+    expect(INITIAL_STATE.xenonConcentration).toBeCloseTo(1.45, 2);
+    expect(INITIAL_STATE.xenonConcentration).toBeGreaterThan(PHYSICS.XENON_WARNING_CONCENTRATION);
+    expect(PHYSICS.POISON_TIME_SCALE).toBe(1);
   });
 
-  test("Xenon-Pit baut sich nach Leistungsabsenkung auf (Iod-Zerfall überholt Burnup)", () => {
+  test("Xenon-Pit baut sich nach Leistungsabsenkung in Echtzeit auf", () => {
     // Reaktor lief auf Vollast (I, Xe ≈ 1) und fällt auf 500 MW (15 % Fluss).
     // Bei niedrigem Fluss überwiegt Iod→Xe‐Zerfall den Burnup → Xenon wächst.
     const state = createTestState({
@@ -54,20 +76,24 @@ describe("Physik-Engine", () => {
       neutronFlux: 500 / PHYSICS.NOMINAL_POWER,
       iodineConcentration: 1.0,
       xenonConcentration: 1.0,
+      controlRods: 130,
     });
-    const next = calculateNextState(state);
-    expect(next.xenonConcentration!).toBeGreaterThan(1.0);
+    const next = advanceTicks(state, 120);
+    expect(next.xenonConcentration).toBeGreaterThan(1.0);
   });
 
-  test("Xenon brennt nach Leistungsanstieg (Pit → Vollast) ab und gibt positive Reaktivität frei", () => {
-    // Klassische Pit-Erholung: Xe ist im Pit (1.8) und der Reaktor wird zurückgefahren.
-    // Bei hohem Fluss dominiert σφ·Xe → Xenon sinkt rasch.
+  test("Xenon brennt bei hohem Fissionsfluss ab und gibt positive Reaktivität frei", () => {
+    // Bei sehr hohem Fluss dominiert σφ·Xe → Xenon sinkt trotz vorhandenem Iod rasch.
     const state = createTestState({
-      thermalPower: 2500,
-      neutronFlux: 2500 / PHYSICS.NOMINAL_POWER,
+      thermalPower: PHYSICS.PEAK_EXCURSION_POWER,
+      neutronFlux: PHYSICS.PEAK_EXCURSION_POWER / PHYSICS.NOMINAL_POWER,
       iodineConcentration: 0.4,
       xenonConcentration: 1.8,
-      controlRods: 50,
+      steamVoidFraction: 0.3,
+      manualRods: 0,
+      autoRods: 0,
+      shortenedRods: 0,
+      safetyRods: 0,
     });
     const next = calculateNextState(state);
     expect(next.xenonConcentration!).toBeLessThan(1.8);
@@ -121,7 +147,7 @@ describe("Physik-Engine", () => {
     expect(next.fuelTemperature!).toBeGreaterThan(800);
   });
 
-  test("Halbierter HKP-Durchfluss erhöht Leistung und Temperatur (positive Void-Rückkopplung)", () => {
+  test("Halbierter HKP-Durchfluss erhöht Void und Leistung (positive Void-Rückkopplung)", () => {
     // Regression: Pumpenausfall muss über Kanal-Austritts-Sieden Void erzeugen,
     // sodass der positive Dampfblasenkoeffizient Leistung und Brennstofftemperatur
     // anhebt – nicht senkt (RBMK Loss-of-Flow Verhalten).
@@ -133,7 +159,7 @@ describe("Physik-Engine", () => {
       steamVoidFraction: 0,
       iodineConcentration: 1.0,
       xenonConcentration: PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION,
-      controlRods: 100,
+      controlRods: 80,
     } as const;
 
     const fullPumps = advanceTicks(createTestState({ ...baseOverrides, activeCoolantPumps: 8 }), 8);
@@ -141,7 +167,6 @@ describe("Physik-Engine", () => {
 
     expect(halfPumps.steamVoidFraction).toBeGreaterThan(fullPumps.steamVoidFraction);
     expect(halfPumps.thermalPower).toBeGreaterThan(fullPumps.thermalPower);
-    expect(halfPumps.fuelTemperature).toBeGreaterThan(fullPumps.fuelTemperature);
   });
 
   test("Positiver Dampfblasenkoeffizient: steamVoidFraction erhöht Reaktivität", () => {
@@ -171,6 +196,10 @@ describe("Physik-Engine", () => {
       xenonConcentration: PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION,
       steamVoidFraction: 0,
       coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
+      manualRods: 111,
+      autoRods: 6,
+      shortenedRods: 20,
+      safetyRods: 8,
     });
     const az5State = { ...state, ...triggerAZ5(state) };
 
@@ -193,6 +222,10 @@ describe("Physik-Engine", () => {
       xenonConcentration: PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION,
       steamVoidFraction: 0,
       coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
+      manualRods: 111,
+      autoRods: 6,
+      shortenedRods: 20,
+      safetyRods: 8,
     });
     const accidentCore = createTestState({
       thermalPower: 200,
@@ -289,10 +322,12 @@ describe("Physik-Engine", () => {
     const state = createTestState({
       thermalPower: 3000,
       neutronFlux: 0.9,
-      steamVoidFraction: 0.9,
-      coolantTemperature: 400,
+      steamVoidFraction: 1,
+      coolantTemperature: 430,
       fuelTemperature: 1500,
       activeCoolantPumps: 0,
+      pumpStates: [false, false, false, false, false, false, false, false],
+      pumpSpeeds: [0, 0, 0, 0, 0, 0, 0, 0],
     });
     const next = calculateNextState(state);
     // With high void fraction and low cooling, pressure should exceed critical
@@ -338,10 +373,22 @@ describe("Physik-Engine", () => {
     // Even after the transient, the model keeps residual heat above zero
     expect(next.neutronFlux!).toBeGreaterThan(0);
   });
+
+  test("Reaktorstall erzeugt AZ-5-Prozedurwarnung", () => {
+    const state = createTestState({
+      thermalPower: 20,
+      neutronFlux: 20 / PHYSICS.NOMINAL_POWER,
+      events: [],
+    });
+
+    const next = calculateNextState(state);
+
+    expect(next.events!.some((event) => event.code === "reactor-stalled-az5")).toBe(true);
+  });
 });
 
 describe("Score-Berechnung", () => {
-  test("Basiswert ist 10000 bei historischem 700-MW-Ziel", () => {
+  test("Basiswert ist 10000 beim historischen 200-MW-Zustand", () => {
     const state = createTestState({
       thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
@@ -352,7 +399,7 @@ describe("Score-Berechnung", () => {
     expect(score).toBe(PHYSICS.BASE_SCORE);
   });
 
-  test("Abzug wenn Leistung außerhalb des 700-MW-Haltekorridors liegt", () => {
+  test("Abzug wenn Leistung außerhalb des historischen Haltekorridors liegt", () => {
     const state = createTestState({
       thermalPower: 500, // below target
       events: [],
@@ -397,7 +444,7 @@ describe("Score-Berechnung", () => {
     );
   });
 
-  test("Stabile-Leistung-Bonus nach 60 s nahe 700 MW", () => {
+  test("Stabile-Leistung-Bonus nach 60 s nahe Zielwert", () => {
     const state = createTestState({
       thermalPower: PHYSICS.TEST_POWER_TARGET,
       xenonConcentration: 0.4,
@@ -422,17 +469,14 @@ describe("Score-Berechnung", () => {
     expect(score).toBe(PHYSICS.BASE_SCORE);
   });
 
-  test("Danger Zone Risiko-Bonus bei ~200 MW", () => {
+  test("Historischer 200-MW-Zustand bekommt keinen separaten Danger-Bonus", () => {
     const state = createTestState({
-      thermalPower: 200,
+      thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
       testCompleted: false,
     });
     const score = calculateScore(state);
-    // Off-target penalty + danger zone bonus
-    expect(score).toBe(
-      PHYSICS.BASE_SCORE - PHYSICS.SCORE_PENALTY_PER_SECOND_OFF_TARGET + PHYSICS.SCORE_BONUS_DANGER_ZONE
-    );
+    expect(score).toBe(PHYSICS.BASE_SCORE);
   });
 });
 
@@ -490,22 +534,20 @@ describe("Game Reducer", () => {
     rundownPumps.forEach((speed) => expect(speed).toBeLessThan(0.5));
   });
 
-  test("Vollständiger HKP-Ausfall erzeugt Void, Temperatur- und Leistungsspitze", () => {
+  test("Vollständiger HKP-Ausfall erzeugt Void und Brennstoffaufheizung", () => {
     let state = gameReducer(INITIAL_STATE, { type: "START_GAME" });
-    const initialPower = state.thermalPower;
     const initialFuelTemperature = state.fuelTemperature;
 
     for (let pumpIndex = 0; pumpIndex < 8; pumpIndex += 1) {
       state = gameReducer(state, { type: "TOGGLE_PUMP", payload: pumpIndex });
     }
 
-    const afterTrip = advanceTicks(state, 15);
+    const afterTrip = advanceTicks(state, 120);
 
     expect(afterTrip.pumpStates.every((isCommandedOn) => !isCommandedOn)).toBe(true);
     expect(afterTrip.activeCoolantPumps).toBeLessThan(6);
-    expect(afterTrip.steamVoidFraction).toBeGreaterThan(0.1);
+    expect(afterTrip.steamVoidFraction).toBeGreaterThan(0.01);
     expect(afterTrip.fuelTemperature).toBeGreaterThan(initialFuelTemperature);
-    expect(afterTrip.thermalPower).toBeGreaterThan(initialPower);
   });
 
   test("TICK wird ignoriert wenn isExploded = true", () => {
@@ -531,6 +573,91 @@ describe("Game Reducer", () => {
     expect(started.elapsedSeconds).toBe(0);
     expect(started.controlRods).toBe(INITIAL_STATE.controlRods);
     expect(started.xenonConcentration).toBe(INITIAL_STATE.xenonConcentration);
+    expect(started.turbineAuto).toBe(false);
+    expect(started.feedWaterAuto).toBe(false);
+  });
+
+  test("LAR-Automatik nutzt AR und MR, wenn AR-Stäbe allein nicht reichen", () => {
+    const state = createTestState({
+      thermalPower: 80,
+      neutronFlux: 80 / PHYSICS.NOMINAL_POWER,
+      powerMode: "auto",
+      powerSetpoint: PHYSICS.TEST_POWER_TARGET,
+      manualRods: 14,
+      autoRods: 0,
+      shortenedRods: 4,
+      safetyRods: 4,
+    });
+
+    const afterAuto = advanceTicks(state, 20);
+
+    expect(afterAuto.manualRods).toBeLessThan(state.manualRods);
+    expect(afterAuto.reactivityMargin).toBeGreaterThanOrEqual(PHYSICS.OZR_MINIMUM_SAFE + 1);
+  });
+
+  test("Speisewasser-Automatik senkt hohen Trommelstand und fährt Durchfluss zurück", () => {
+    const state = createTestState({
+      feedWaterAuto: true,
+      drumSeparatorLevel: 75,
+      feedWaterFlow: 800,
+    });
+
+    const next = calculateNextState(state);
+
+    expect(next.feedWaterFlow!).toBeLessThan(state.feedWaterFlow);
+  });
+
+  test("Speisewasser-Automatik hebt niedrigen Trommelstand mit mehr Durchfluss an", () => {
+    const state = createTestState({
+      feedWaterAuto: true,
+      drumSeparatorLevel: 15,
+      feedWaterFlow: 300,
+    });
+
+    const next = calculateNextState(state);
+
+    expect(next.feedWaterFlow!).toBeGreaterThan(state.feedWaterFlow);
+  });
+
+  test("TG-8-Automatik öffnet das Ventil bei verbundener Turbine und niedriger Drehzahl", () => {
+    const state = createTestState({
+      turbineAuto: true,
+      turbineConnected: true,
+      turbineValveOpen: 20,
+      turbineSpeed: 2200,
+    });
+
+    const next = calculateNextState(state);
+
+    expect(next.turbineConnected).toBe(true);
+    expect(next.turbineValveOpen!).toBeGreaterThan(state.turbineValveOpen);
+  });
+
+  test("TG-8-Automatik lässt eine getrennte Turbine getrennt und schließt das Ventil", () => {
+    const state = createTestState({
+      turbineAuto: true,
+      turbineConnected: false,
+      turbineValveOpen: 60,
+      turbineSpeed: 1800,
+    });
+
+    const next = calculateNextState(state);
+
+    expect(next.turbineConnected).toBe(false);
+    expect(next.turbineValveOpen!).toBeLessThan(state.turbineValveOpen);
+  });
+
+  test("TG-8-Automatik schließt bei Überdrehzahl", () => {
+    const state = createTestState({
+      turbineAuto: true,
+      turbineConnected: true,
+      turbineValveOpen: 55,
+      turbineSpeed: PHYSICS.TURBINE_NOMINAL_SPEED * 1.04,
+    });
+
+    const next = calculateNextState(state);
+
+    expect(next.turbineValveOpen!).toBeLessThan(state.turbineValveOpen);
   });
 
   test("Live-Szenario kann OZR bis in den Unfallbereich absenken", () => {

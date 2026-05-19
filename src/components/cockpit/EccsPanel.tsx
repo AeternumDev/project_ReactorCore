@@ -12,21 +12,25 @@ export default function EccsPanel({ eccsEnabled, dispatch }: EccsPanelProps) {
     <div
       style={{
         border: `1px solid ${eccsEnabled ? 'var(--safe-green)' : 'var(--alarm-red)'}`,
-        padding: '12px',
+        padding: '6px',
         background: 'var(--surface)',
+        minWidth: 0,
       }}
     >
       <div
         style={{
           fontFamily: 'var(--font-share-tech-mono), monospace',
           color: 'var(--amber)',
-          fontSize: '0.9rem',
-          marginBottom: '8px',
+          fontSize: '0.68rem',
+          marginBottom: '5px',
           borderBottom: '1px solid var(--border)',
-          paddingBottom: '6px',
+          paddingBottom: '4px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center' }}>NOTKÜHLSYSTEM (ECCS)
+        <span style={{ display: 'flex', alignItems: 'center' }}>ECCS / SAOR
           <InfoTooltip text={`Notkernkühlsystem (ECCS) — pumpt bei Kühlmittelverlust kaltes Wasser in den Kern.
 
 Im historischen Test wurde ECCS abgeschaltet, um eine Fehlauslösung zu verhindern.
@@ -45,19 +49,21 @@ Klicken zum Ein-/Ausschalten.`} />
           width: '100%',
           background: 'transparent',
           border: `2px solid ${eccsEnabled ? 'var(--safe-green)' : 'var(--alarm-red)'}`,
-          padding: '16px',
+          padding: '6px',
           cursor: 'pointer',
-          display: 'flex',
+          display: 'grid',
+          gridTemplateColumns: '34px minmax(0, 1fr)',
           alignItems: 'center',
-          gap: '12px',
-          boxShadow: `0 0 8px ${eccsEnabled ? 'var(--safe-green)' : 'var(--alarm-red)'}`,
+          gap: '6px',
+          boxShadow: `0 0 5px ${eccsEnabled ? 'var(--safe-green)' : 'var(--alarm-red)'}`,
+          minHeight: '48px',
         }}
       >
         {/* Toggle switch */}
         <div
           style={{
-            width: '48px',
-            height: '24px',
+            width: '32px',
+            height: '16px',
             border: `1px solid ${eccsEnabled ? 'var(--safe-green)' : 'var(--alarm-red)'}`,
             position: 'relative',
             background: 'var(--bg)',
@@ -65,37 +71,39 @@ Klicken zum Ein-/Ausschalten.`} />
         >
           <div
             style={{
-              width: '20px',
-              height: '20px',
+              width: '12px',
+              height: '12px',
               background: eccsEnabled ? 'var(--safe-green)' : 'var(--alarm-red)',
               position: 'absolute',
               top: '1px',
-              left: eccsEnabled ? '25px' : '1px',
+              left: eccsEnabled ? '17px' : '1px',
               transition: 'left 0.15s',
             }}
           />
         </div>
 
-        <div style={{ textAlign: 'left' }}>
+        <div style={{ textAlign: 'left', minWidth: 0 }}>
           <div
             style={{
               fontFamily: 'var(--font-share-tech-mono), monospace',
-              fontSize: '0.9rem',
+              fontSize: '0.64rem',
               color: eccsEnabled ? 'var(--safe-green)' : 'var(--alarm-red)',
+              lineHeight: 1.1,
             }}
             className={!eccsEnabled ? 'animate-pulse-alarm' : ''}
           >
-            {eccsEnabled ? 'AKTIV — HISTORISCH INKORREKT' : 'DEAKTIVIERT — HISTORISCH KORREKT'}
+            {eccsEnabled ? 'AKTIV' : 'DEAKTIVIERT'}
           </div>
           <div
             style={{
               fontFamily: 'var(--font-share-tech-mono), monospace',
-              fontSize: '0.7rem',
+              fontSize: '0.52rem',
               color: '#666',
-              marginTop: '4px',
+              marginTop: '3px',
+              lineHeight: 1.2,
             }}
           >
-            Test-Protokoll: ECCS vor Testbeginn abschalten
+            {eccsEnabled ? 'Schutz bereit' : 'Historischer Testzustand'}
           </div>
         </div>
       </button>

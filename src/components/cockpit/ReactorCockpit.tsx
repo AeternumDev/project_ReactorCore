@@ -25,6 +25,19 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function parseClockSeconds(clock: string): number {
+  const [hours, minutes, seconds] = clock.split(':').map(Number);
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+function formatHistoricalClock(elapsedSeconds: number): string {
+  const totalSeconds = (parseClockSeconds(PHYSICS.HISTORICAL_START_CLOCK) + Math.floor(elapsedSeconds)) % (24 * 3600);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 export default function ReactorCockpit() {
   const router = useRouter();
   const [state, dispatch] = useReducer(gameReducer, INITIAL_STATE);
@@ -96,9 +109,22 @@ export default function ReactorCockpit() {
         <span style={{ color: 'var(--amber)' }}>
           T+{formatTime(state.elapsedSeconds)} / {formatTime(PHYSICS.TEST_DURATION_SECONDS)}
         </span>
-        <span style={{ color: 'var(--amber)', fontSize: '0.9rem', letterSpacing: '3px' }}>
-          REAKTOR 4 — RBMK-1000 — ZIEL: {PHYSICS.TEST_POWER_TARGET} MW
-        </span>
+        <div style={{ textAlign: 'center', lineHeight: 1.1 }}>
+          <div style={{ color: 'var(--amber)', fontSize: '0.82rem', letterSpacing: '3px' }}>
+            REAKTOR 4 — RBMK-1000 — ZIEL: {PHYSICS.TEST_POWER_TARGET} MW
+          </div>
+          <div
+            className={state.elapsedSeconds >= PHYSICS.TEST_DURATION_SECONDS - 60 ? 'animate-blink' : ''}
+            style={{
+              color: state.elapsedSeconds >= PHYSICS.TEST_DURATION_SECONDS - 60 ? 'var(--warning-yellow)' : 'var(--safe-green)',
+              fontSize: '1.65rem',
+              letterSpacing: '0.12em',
+              marginTop: '2px',
+            }}
+          >
+            {formatHistoricalClock(state.elapsedSeconds)}
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <span style={{
             color: state.reactivityMargin < PHYSICS.OZR_MINIMUM_SAFE ? 'var(--alarm-red)' :
@@ -135,7 +161,7 @@ export default function ReactorCockpit() {
         className="cockpit-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: '340px 1fr 320px',
+          gridTemplateColumns: '300px minmax(780px, 1fr) 300px',
           flex: 1,
           gap: '2px',
           padding: '2px',
@@ -156,8 +182,7 @@ export default function ReactorCockpit() {
             rundownBusActive={state.rundownBusActive}
             dispatch={dispatch}
           />
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '4px' }}>
             <EccsPanel eccsEnabled={state.eccsEnabled} dispatch={dispatch} />
             <BAZPanel
               bazArmed={state.bazArmed}
@@ -166,7 +191,12 @@ export default function ReactorCockpit() {
             />
           </div>
 
-          <AZ5Button az5Active={state.az5Active} dispatch={dispatch} />
+          <AZ5Button
+            az5Active={state.az5Active}
+            thermalPower={state.thermalPower}
+            reactivityMargin={state.reactivityMargin}
+            dispatch={dispatch}
+          />
 
           <TestChecklistPanel
             thermalPower={state.thermalPower}
@@ -194,8 +224,8 @@ export default function ReactorCockpit() {
           flexDirection: 'column',
           gap: '4px',
           width: '100%',
-          maxWidth: '1100px',
-          margin: '0 auto',
+          maxWidth: 'none',
+          margin: 0,
           minWidth: 0,
         }}>
           <div style={{ display: 'flex', gap: '4px' }}>
@@ -314,10 +344,12 @@ export default function ReactorCockpit() {
           <TurbinePanel
             turbineConnected={state.turbineConnected}
             turbineValveOpen={state.turbineValveOpen}
+            turbineAuto={state.turbineAuto}
             turbineSpeed={state.turbineSpeed}
             generatorOutput={state.generatorOutput}
             steamPressure={state.steamPressure}
             feedWaterFlow={state.feedWaterFlow}
+            feedWaterAuto={state.feedWaterAuto}
             drumSeparatorLevel={state.drumSeparatorLevel}
             dispatch={dispatch}
           />
@@ -386,7 +418,7 @@ export default function ReactorCockpit() {
       )}
 
       <style>{`
-        @media (max-width: 1200px) {
+        @media (max-width: 1399px) {
           .cockpit-grid { display: none !important; }
           .mobile-warning { display: block !important; }
         }

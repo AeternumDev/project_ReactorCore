@@ -45,22 +45,26 @@ export default function BAZPanel({ bazArmed, bazTriggered, dispatch }: BAZPanelP
     <div
       style={{
         border: `1px solid ${bazColor}`,
-        padding: '8px',
+        padding: '6px',
         background: 'var(--surface)',
         boxShadow: bazTriggered ? '0 0 10px var(--alarm-red)' : 'none',
+        minWidth: 0,
       }}
     >
       <div
         style={{
           fontFamily: 'var(--font-share-tech-mono), monospace',
           color: bazColor,
-          fontSize: '0.85rem',
-          marginBottom: '6px',
+          fontSize: '0.68rem',
+          marginBottom: '5px',
           borderBottom: '1px solid var(--border)',
           paddingBottom: '4px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center' }}>BAZ — SCHNELLE NOTABSCHALTUNG
+        <span style={{ display: 'flex', alignItems: 'center' }}>BAZ-SCHUTZ
           <InfoTooltip text={`BAZ — Schnelles Notabschaltsystem. Fährt alle Stäbe beschleunigt ein.
 
 Schritt 1: SCHARFSCHALTEN — System bereit machen.
@@ -73,7 +77,7 @@ Langsamer als AZ-5, aber schneller als manuelles Einfahren.`} />
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
         {/* Arm/Disarm Toggle */}
         <button
           onClick={() => !bazTriggered && dispatch({ type: 'TOGGLE_BAZ' })}
@@ -81,11 +85,12 @@ Langsamer als AZ-5, aber schneller als manuelles Einfahren.`} />
           style={{
             background: 'transparent',
             border: `1px solid ${bazColor}`,
-            padding: '6px 8px',
+            padding: '5px 6px',
             cursor: bazTriggered ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '6px',
+            minHeight: '30px',
           }}
         >
           {/* LED */}
@@ -101,12 +106,14 @@ Langsamer als AZ-5, aber schneller als manuelles Einfahren.`} />
           <div
             style={{
               fontFamily: 'var(--font-share-tech-mono), monospace',
-              fontSize: '0.75rem',
+              fontSize: '0.62rem',
               color: bazColor,
               textAlign: 'left',
+              lineHeight: 1.1,
+              minWidth: 0,
             }}
           >
-            {bazTriggered ? 'AUSGELÖST' : bazArmed ? 'SCHARFGESCHALTET' : 'BLOCKIERT — HISTORISCH KORREKT'}
+            {bazTriggered ? 'AUSGELÖST' : bazArmed ? 'SCHARF' : 'BLOCKIERT'}
           </div>
         </button>
 
@@ -121,13 +128,14 @@ Langsamer als AZ-5, aber schneller als manuelles Einfahren.`} />
           style={{
             background: bazTriggered ? '#400' : 'var(--bg)',
             border: `1px solid var(--warning-yellow)`,
-            padding: '8px',
+            padding: '6px',
             cursor: bazTriggered ? 'not-allowed' : 'pointer',
             fontFamily: 'var(--font-share-tech-mono), monospace',
-            fontSize: '0.8rem',
+            fontSize: '0.62rem',
             color: 'var(--warning-yellow)',
             position: 'relative',
             overflow: 'hidden',
+            minHeight: '30px',
           }}
         >
           {holdProgress > 0 && holdProgress < 100 && (
@@ -142,22 +150,20 @@ Langsamer als AZ-5, aber schneller als manuelles Einfahren.`} />
               }}
             />
           )}
-          {bazTriggered ? '⚡ BAZ AKTIV' : '⚡ MANUELL AUSLÖSEN'}
+          {bazTriggered ? 'BAZ AKTIV' : 'HALTEN: AUSLÖSEN'}
         </button>
 
         {/* Auto-trigger conditions */}
         <div
           style={{
             fontFamily: 'var(--font-share-tech-mono), monospace',
-            fontSize: '0.6rem',
+            fontSize: '0.5rem',
             color: '#555',
-            lineHeight: '1.4',
+            lineHeight: '1.25',
           }}
         >
-          AUTO-AUSLÖSUNG BEI:
-          <br />• LEISTUNG {'>'} 110% SOLLWERT
-          <br />• DAMPFDRUCK {'>'} 88 BAR
-          <br />• KÜHLFLUSS {'<'} 2000 L/s
+          AUTO: P&gt;110% | DR&gt;88 BAR
+          <br />KÜHLFLUSS &lt;2000 L/s
         </div>
       </div>
     </div>

@@ -2,20 +2,21 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import ReactorCockpit from '@/components/cockpit/ReactorCockpit';
+import { PHYSICS } from '@/lib/physics/constants';
 
 type GamePhase = 'briefing' | 'playing';
 
 const BRIEFING_TEXT = [
-  'Am 25. April 1986 sollte am Reaktor 4 des Kernkraftwerks Tschernobyl ein Sicherheitstest durchgeführt werden. Ziel war es zu prüfen, ob die Turbinen bei einem Stromausfall genügend Energie liefern können, um die Kühlmittelpumpen bis zum Anspringen der Notstromdiesel zu betreiben.',
-  'Der Test war ursprünglich für den Nachmittag geplant, wurde aber auf Anweisung des Lastverteilers in Kiew auf die Nachtschicht verschoben. Die neue Mannschaft war mit dem Testverfahren weniger vertraut.',
-  'Während der Leistungsabsenkung fiel die Reaktorleistung aufgrund von Xenon-Vergiftung auf nahezu Null. Um den Test dennoch durchzuführen, wurden die Steuerstäbe weit über das sichere Minimum hinaus gezogen — ein fataler Fehler.',
+  `Startzeit ist ${PHYSICS.HISTORICAL_START_CLOCK}: etwa acht Minuten vor der Explosion. Der Reaktor ist bereits auf rund ${PHYSICS.TEST_POWER_TARGET} MW gefallen und wurde nach dem fast vollständigen Leistungsabsturz wieder hochgezogen.`,
+  'Die Xenon-Vergiftung ist nicht mehr ein zukünftiges Ereignis, sondern Anfangsbedingung. Iod-135 ist nach der langen Leistungsabsenkung reduziert, Xenon-135 liegt hoch, und der operative Reaktivitätsvorrat befindet sich nur noch im Warnbereich.',
+  'SAOR/ECCS ist für den Test isoliert und die relevante Schutzblockierung ist gesetzt. Diese Anzeigen sind historische Testkonfigurationen; akut gefährlich wird der Zustand erst, wenn OZR, Void, Kühlfluss oder Leistung weiter entgleisen.',
 ];
 
 const CONTROL_TABLE = [
-  { element: 'Steuerstäbe', beschreibung: 'Absorbieren Neutronen. Weniger Stäbe = mehr Leistung. Minimum: 15 eingefahren!', typ: 'Slider' },
+  { element: 'Steuerstäbe', beschreibung: `Absorbieren Neutronen. Weniger Stäbe = mehr Leistung. OZR-Minimum: ${PHYSICS.OZR_MINIMUM_SAFE} Stabäquivalente.`, typ: 'Slider' },
   { element: 'Kühlmittelpumpen', beschreibung: '8 Hauptkreislaufpumpen. Mehr Pumpen = bessere Kühlung.', typ: 'Toggle' },
   { element: 'ECCS', beschreibung: 'Notkühlsystem. Wurde vor dem Test abgeschaltet (historisch).', typ: 'Schalter' },
-  { element: 'AZ-5', beschreibung: 'Notabschalter. Fährt alle Stäbe ein — aber Graphitspitzen verursachen erst einen Leistungsspike!', typ: 'Button' },
+  { element: 'AZ-5', beschreibung: `Notabschalter. Historisch um ${PHYSICS.HISTORICAL_AZ5_CLOCK} gedrückt; bei niedrigem OZR und Void entsteht zuerst positive Reaktivität.`, typ: 'Button' },
 ];
 
 export default function GamePage() {
@@ -24,10 +25,7 @@ export default function GamePage() {
 
   useEffect(() => {
     if (phase !== 'briefing') return;
-    if (countdown <= 0) {
-      setPhase('playing');
-      return;
-    }
+    if (countdown <= 0) return;
     const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [phase, countdown]);
@@ -36,7 +34,7 @@ export default function GamePage() {
     setPhase('playing');
   }, []);
 
-  if (phase === 'playing') {
+  if (phase === 'playing' || countdown <= 0) {
     return <ReactorCockpit />;
   }
 
@@ -62,7 +60,7 @@ export default function GamePage() {
           paddingBottom: '12px',
         }}
       >
-        OPERATOREN-BRIEFING | SCHICHT: NACHT | DATUM: 25.04.1986
+        OPERATOREN-BRIEFING | SCHICHT: NACHT | DATUM: 26.04.1986 | ZEIT: {PHYSICS.HISTORICAL_START_CLOCK}
       </h1>
 
       {/* Two columns */}
@@ -141,7 +139,7 @@ export default function GamePage() {
         </div>
       </div>
 
-      {/* Time compression / physics-model disclosure */}
+      {/* Real-time / physics-model disclosure */}
       <section
         style={{
           marginTop: '32px',
@@ -158,7 +156,7 @@ export default function GamePage() {
             marginBottom: '12px',
           }}
         >
-          ZEITRAFFER &amp; PHYSIK-MODELL
+          ECHTZEIT-AUSSCHNITT &amp; PHYSIK-MODELL
         </h2>
         <div
           style={{
@@ -172,14 +170,13 @@ export default function GamePage() {
         >
           <div>
             <p style={{ color: 'var(--amber)', marginBottom: '8px' }}>
-              SIMULATION (komprimiert)
+              SIMULATION (Echtzeitfenster)
             </p>
             <ul style={{ paddingLeft: '18px', margin: 0 }}>
-              <li>Schichtdauer: <strong style={{ color: 'var(--safe-green)' }}>8 Minuten</strong> (480 s).</li>
+              <li>Spielzeit: <strong style={{ color: 'var(--safe-green)' }}>8 Minuten</strong> von {PHYSICS.HISTORICAL_START_CLOCK} bis {PHYSICS.HISTORICAL_EXPLOSION_CLOCK}.</li>
               <li>
-                Iod-/Xenon-Dynamik läuft <strong style={{ color: 'var(--safe-green)' }}>~360-fach</strong>{' '}
-                beschleunigt (POISON_TIME_SCALE = 360). 1 Spielsekunde ≈ 6 simulierte Reaktorminuten,
-                damit die Xenon-Falle in einer spielbaren Session sichtbar wird.
+                Iod-/Xenon-Dynamik läuft <strong style={{ color: 'var(--safe-green)' }}>in Echtzeit</strong>{' '}
+                (POISON_TIME_SCALE = {PHYSICS.POISON_TIME_SCALE}). Die langen Vorstunden sind in den Startwerten enthalten.
               </li>
               <li>
                 AZ-5 fährt Stäbe in <strong style={{ color: 'var(--safe-green)' }}>18 s</strong> ein
@@ -198,14 +195,12 @@ export default function GamePage() {
             </p>
             <ul style={{ paddingLeft: '18px', margin: 0 }}>
               <li>
-                Leistungsabsenkung von 3200 → ~1600 MW über{' '}
-                <strong style={{ color: 'var(--alarm-red)' }}>~9 Stunden</strong>; Test wegen
-                Lastverteiler verschoben.
+                Leistungsabsenkung von 3200 → ~1600 MW, lange Haltephase wegen Lastverteiler,
+                danach weiterer Abfall bis fast Null und Wiederanfahren auf ~200 MW.
               </li>
               <li>
-                Xenon-Vergiftung baute sich über{' '}
-                <strong style={{ color: 'var(--alarm-red)' }}>mehrere Stunden</strong> auf, Leistung
-                fiel um 00:28 auf ~30 MW.
+                Xenon-135 war im Niedrigleistungszustand stark wirksam; die Operatoren zogen
+                zahlreiche Stäbe, wodurch der OZR in den Warn- und später Unfallbereich fiel.
               </li>
               <li>
                 Stabilisierungsversuch 01:00–01:23 → AZ-5 um{' '}

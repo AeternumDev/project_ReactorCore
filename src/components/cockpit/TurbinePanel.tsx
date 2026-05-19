@@ -6,28 +6,37 @@ import InfoTooltip from './InfoTooltip';
 interface TurbinePanelProps {
   turbineConnected: boolean;
   turbineValveOpen: number;
+  turbineAuto: boolean;
   turbineSpeed: number;
   generatorOutput: number;
   steamPressure: number;
   feedWaterFlow: number;
+  feedWaterAuto: boolean;
   drumSeparatorLevel: number;
   dispatch: React.Dispatch<
     | { type: 'TOGGLE_TURBINE' }
+    | { type: 'TOGGLE_TURBINE_AUTO' }
     | { type: 'SET_TURBINE_VALVE'; payload: number }
     | { type: 'SET_FEED_WATER'; payload: number }
+    | { type: 'TOGGLE_FEED_WATER_AUTO' }
   >;
 }
 
 export default function TurbinePanel({
   turbineConnected,
   turbineValveOpen,
+  turbineAuto,
   turbineSpeed,
   generatorOutput,
   steamPressure,
   feedWaterFlow,
+  feedWaterAuto,
   drumSeparatorLevel,
   dispatch,
 }: TurbinePanelProps) {
+  const displayedValve = Math.round(turbineValveOpen);
+  const displayedFeedWater = Math.round(feedWaterFlow);
+  const feedWaterPercent = Math.max(0, Math.min(100, (feedWaterFlow / 1000) * 100));
   const drumColor = drumSeparatorLevel < PHYSICS.DRUM_LEVEL_LOW ? 'var(--alarm-red)' :
     drumSeparatorLevel > PHYSICS.DRUM_LEVEL_HIGH ? 'var(--warning-yellow)' : 'var(--safe-green)';
   const speedPercent = (turbineSpeed / PHYSICS.TURBINE_NOMINAL_SPEED) * 100;
@@ -70,6 +79,22 @@ Die Generatorleistung muss die Kühlmittelpumpen während des Auslaufs versorgen
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <button
+          onClick={() => dispatch({ type: 'TOGGLE_TURBINE_AUTO' })}
+          style={{
+            background: turbineAuto ? 'rgba(0,255,65,0.12)' : 'transparent',
+            border: `1px solid ${turbineAuto ? 'var(--safe-green)' : '#333'}`,
+            color: turbineAuto ? 'var(--safe-green)' : '#666',
+            padding: '5px 8px',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-share-tech-mono), monospace',
+            fontSize: '0.72rem',
+            letterSpacing: '0.05em',
+          }}
+        >
+          TG-8 VENTIL-AUTO: {turbineAuto ? 'EIN' : 'AUS'}
+        </button>
+
         {/* Turbine connect/disconnect */}
         <button
           onClick={() => dispatch({ type: 'TOGGLE_TURBINE' })}
@@ -118,14 +143,16 @@ Die Generatorleistung muss die Kühlmittelpumpen während des Auslaufs versorgen
             type="range"
             min={0}
             max={100}
-            value={turbineValveOpen}
+            value={displayedValve}
+            disabled={turbineAuto}
             onChange={(e) => dispatch({ type: 'SET_TURBINE_VALVE', payload: Number(e.target.value) })}
             style={{
               flex: 1,
               height: '4px',
               appearance: 'none',
-              background: `linear-gradient(to right, var(--amber) ${turbineValveOpen}%, #333 ${turbineValveOpen}%)`,
-              cursor: 'pointer',
+              background: `linear-gradient(to right, var(--amber) ${displayedValve}%, #333 ${displayedValve}%)`,
+              cursor: turbineAuto ? 'not-allowed' : 'pointer',
+              opacity: turbineAuto ? 0.55 : 1,
             }}
           />
           <span
@@ -137,7 +164,7 @@ Die Generatorleistung muss die Kühlmittelpumpen während des Auslaufs versorgen
               textAlign: 'right',
             }}
           >
-            {turbineValveOpen}%
+            {displayedValve}%
           </span>
         </div>
 
@@ -145,7 +172,7 @@ Die Generatorleistung muss die Kühlmittelpumpen während des Auslaufs versorgen
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            gridTemplateColumns: '1fr 1fr 1fr',
             gap: '4px',
             fontFamily: 'var(--font-share-tech-mono), monospace',
             fontSize: '0.7rem',
@@ -173,6 +200,17 @@ Die Generatorleistung muss die Kühlmittelpumpen während des Auslaufs versorgen
             </div>
             <div style={{ color: '#555', fontSize: '0.55rem' }}>MW(e)</div>
           </div>
+          <div style={{
+            border: '1px solid var(--border)',
+            padding: '4px 6px',
+            background: 'var(--bg)',
+          }}>
+            <div style={{ color: '#555', fontSize: '0.6rem' }}>DAMPFDR.</div>
+            <div style={{ color: 'var(--amber)', fontSize: '0.9rem' }} className="seven-segment">
+              {steamPressure.toFixed(0)}
+            </div>
+            <div style={{ color: '#555', fontSize: '0.55rem' }}>BAR</div>
+          </div>
         </div>
 
         {/* SPEISEWASSER / TROMMELABSCHEIDER */}
@@ -192,6 +230,24 @@ Die Generatorleistung muss die Kühlmittelpumpen während des Auslaufs versorgen
             SPEISEWASSER / TROMMELABSCHEIDER
           </div>
 
+          <button
+            onClick={() => dispatch({ type: 'TOGGLE_FEED_WATER_AUTO' })}
+            style={{
+              width: '100%',
+              background: feedWaterAuto ? 'rgba(0,255,65,0.12)' : 'transparent',
+              border: `1px solid ${feedWaterAuto ? 'var(--safe-green)' : '#333'}`,
+              color: feedWaterAuto ? 'var(--safe-green)' : '#666',
+              padding: '5px 8px',
+              marginBottom: '6px',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-share-tech-mono), monospace',
+              fontSize: '0.72rem',
+              letterSpacing: '0.05em',
+            }}
+          >
+            SPEISEWASSER-AUTOMATIK: {feedWaterAuto ? 'EIN' : 'AUS'}
+          </button>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
             <span style={{
               fontFamily: 'var(--font-share-tech-mono), monospace',
@@ -204,14 +260,16 @@ Die Generatorleistung muss die Kühlmittelpumpen während des Auslaufs versorgen
               min={0}
               max={1000}
               step={10}
-              value={feedWaterFlow}
+              value={displayedFeedWater}
+              disabled={feedWaterAuto}
               onChange={(e) => dispatch({ type: 'SET_FEED_WATER', payload: Number(e.target.value) })}
               style={{
                 flex: 1,
                 height: '4px',
                 appearance: 'none',
-                background: `linear-gradient(to right, #2288cc ${(feedWaterFlow / 1000) * 100}%, #333 ${(feedWaterFlow / 1000) * 100}%)`,
-                cursor: 'pointer',
+                background: `linear-gradient(to right, #2288cc ${feedWaterPercent.toFixed(0)}%, #333 ${feedWaterPercent.toFixed(0)}%)`,
+                cursor: feedWaterAuto ? 'not-allowed' : 'pointer',
+                opacity: feedWaterAuto ? 0.55 : 1,
               }}
             />
             <span style={{
@@ -220,7 +278,7 @@ Die Generatorleistung muss die Kühlmittelpumpen während des Auslaufs versorgen
               color: '#2288cc',
               minWidth: '48px',
               textAlign: 'right',
-            }}>{feedWaterFlow} L/s</span>
+            }}>{displayedFeedWater} L/s</span>
           </div>
 
           <div style={{
