@@ -5,13 +5,13 @@ import InfoTooltip from './InfoTooltip';
 import { PHYSICS } from '@/lib/physics/constants';
 
 interface AZ5ButtonProps {
-  az5Active: boolean;
+  az5Triggered: boolean;
   thermalPower: number;
   reactivityMargin: number;
   dispatch: React.Dispatch<{ type: 'TRIGGER_AZ5' }>;
 }
 
-export default function AZ5Button({ az5Active, thermalPower, reactivityMargin, dispatch }: AZ5ButtonProps) {
+export default function AZ5Button({ az5Triggered, thermalPower, reactivityMargin, dispatch }: AZ5ButtonProps) {
   const [capOpen, setCapOpen] = useState(false);
   const [holdProgress, setHoldProgress] = useState(0);
   const holdTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -25,10 +25,10 @@ export default function AZ5Button({ az5Active, thermalPower, reactivityMargin, d
     }
   }, [holdProgress, dispatch]);
 
-  const reactorStalled = thermalPower <= PHYSICS.XENON_STALL_POWER && !az5Active;
+  const reactorStalled = thermalPower <= PHYSICS.XENON_STALL_POWER && !az5Triggered;
 
   const startHold = useCallback(() => {
-    if (az5Active) return;
+    if (az5Triggered) return;
     if (!capOpen) {
       setCapOpen(true);
       return;
@@ -44,7 +44,7 @@ export default function AZ5Button({ az5Active, thermalPower, reactivityMargin, d
         return next;
       });
     }, 100);
-  }, [az5Active, capOpen]);
+  }, [az5Triggered, capOpen]);
 
   const endHold = useCallback(() => {
     if (holdTimer.current) {
@@ -62,7 +62,7 @@ export default function AZ5Button({ az5Active, thermalPower, reactivityMargin, d
         border: '1px solid var(--alarm-red)',
         padding: '12px',
         background: 'var(--surface)',
-        boxShadow: az5Active ? '0 0 15px var(--alarm-red)' : 'none',
+        boxShadow: az5Triggered ? '0 0 15px var(--alarm-red)' : 'none',
       }}
     >
       <div
@@ -110,7 +110,7 @@ Nur im absoluten Notfall verwenden!`} />
 
       <div style={{ position: 'relative' }}>
         {/* Safety cap */}
-        {!capOpen && !az5Active && (
+        {!capOpen && !az5Triggered && (
           <div
             onClick={() => setCapOpen(true)}
             style={{
@@ -143,13 +143,13 @@ Nur im absoluten Notfall verwenden!`} />
           onMouseLeave={endHold}
           onTouchStart={startHold}
           onTouchEnd={endHold}
-          disabled={az5Active}
+          disabled={az5Triggered}
           style={{
             width: '100%',
             padding: '20px',
-            background: az5Active ? '#400' : 'var(--bg)',
+            background: az5Triggered ? '#400' : 'var(--bg)',
             border: `2px solid var(--alarm-red)`,
-            cursor: az5Active ? 'not-allowed' : 'pointer',
+            cursor: az5Triggered ? 'not-allowed' : 'pointer',
             color: 'var(--alarm-red)',
             fontFamily: 'var(--font-share-tech-mono), monospace',
             fontSize: '1.1rem',
@@ -171,8 +171,8 @@ Nur im absoluten Notfall verwenden!`} />
               }}
             />
           )}
-          {az5Active ? '☢ AZ-5 AKTIVIERT' : '☢ AZ-5 NOTABSCHALTER'}
-          {!az5Active && capOpen && (
+          {az5Triggered ? '☢ AZ-5 AUSGELÖST' : '☢ AZ-5 NOTABSCHALTER'}
+          {!az5Triggered && capOpen && (
             <div style={{ fontSize: '0.7rem', marginTop: '4px', color: '#888' }}>
               3 SEKUNDEN HALTEN ZUM AKTIVIEREN
             </div>

@@ -38,30 +38,50 @@ export interface ChecklistStatus extends ChecklistItem {
   status: 'completed' | 'active' | 'pending';
 }
 
-export const POWER_HOLD_SECONDS = 60;
+export const POWER_HOLD_SECONDS = 20;
 export const RUNDOWN_OBSERVATION_SECONDS = 15;
 
 const CHECKLIST: ChecklistItem[] = [
   {
     id: 'power-band',
     step: '01',
-    title: 'NIEDRIGLEISTUNGS-ZUSTAND BESTÄTIGEN',
-    instruction: `Reaktorleistung im historischen Bereich um ${PHYSICS.TEST_POWER_TARGET} MW(th) halten.`,
+    title: '700-MW-TESTBEREICH BESTÄTIGEN',
+    instruction: `Reaktorleistung im geplanten Testbereich ${PHYSICS.TEST_POWER_MIN}-${PHYSICS.TEST_POWER_MAX} MW(th) bestätigen.`,
     check: (context) => (
       context.thermalPower >= PHYSICS.TEST_POWER_MIN &&
       context.thermalPower <= PHYSICS.TEST_POWER_MAX
     ),
   },
   {
-    id: 'power-hold',
+    id: 'xenon-slip',
     step: '02',
-    title: 'LEISTUNG STABIL HALTEN',
-    instruction: `Leistung ${POWER_HOLD_SECONDS} Sekunden durchgehend nahe ${PHYSICS.TEST_POWER_TARGET} MW(th) halten; keine grossen Stabspruenge.`,
+    title: 'XENON-LEISTUNGSABFALL ERKENNEN',
+    instruction: `Sinkende Leistung unter ${PHYSICS.TEST_POWER_MIN} MW(th) als Xenon-Pit behandeln; LAR/MR gegen den Abfall ausfahren.`,
+    check: (context) => (
+      context.thermalPower < PHYSICS.TEST_POWER_MIN &&
+      context.thermalPower > PHYSICS.XENON_STALL_POWER
+    ),
+  },
+  {
+    id: 'low-ozr-recovery',
+    step: '03',
+    title: 'LEISTUNG MIT STABAUSFAHRT ZURÜCKHOLEN',
+    instruction: `MR/USP so weit ausfahren, bis die Leistung wieder in Richtung ${PHYSICS.TEST_POWER_TARGET} MW(th) reagiert; OZR-Warnbereich protokollieren.`,
+    check: (context) => (
+      context.reactivityMargin < PHYSICS.OZR_WARNING &&
+      context.thermalPower >= PHYSICS.XENON_STALL_POWER
+    ),
+  },
+  {
+    id: 'power-hold',
+    step: '04',
+    title: 'KURZSTABILISIERUNG VOR AUSLAUF',
+    instruction: `Leistung ${POWER_HOLD_SECONDS} Sekunden nahe ${PHYSICS.TEST_POWER_TARGET} MW(th) halten; keine Stabreserve zurückgewinnen.`,
     check: (context) => context.stablePowerSeconds >= POWER_HOLD_SECONDS,
   },
   {
     id: 'turbine-ready',
-    step: '03',
+    step: '05',
     title: 'TG-8 AUF DAMPF HALTEN',
     instruction: 'Turbogenerator Nr. 8 gekoppelt lassen, Dampfventil mindestens 60 % offen halten und Drehzahl von mindestens 2800 U/min sicherstellen.',
     check: (context) => (
@@ -72,7 +92,7 @@ const CHECKLIST: ChecklistItem[] = [
   },
   {
     id: 'water-regime',
-    step: '04',
+    step: '06',
     title: 'WASSER- UND KÜHLREGIME SICHERN',
     instruction: 'Speisewasser im Bereich 350–650 L/s, Trommelabscheider bei 35–65 % und Kühlmitteldurchfluss oberhalb von 5600 L/s halten.',
     check: (context) => (
@@ -86,28 +106,32 @@ const CHECKLIST: ChecklistItem[] = [
   },
   {
     id: 'eccs-disconnect',
-    step: '05',
+    step: '07',
     title: 'ECCS FÜR DEN VERSUCH ABGESCHALTET',
     instruction: 'Notkernkühlsystem (ECCS) für den Auslauftest abgeschaltet lassen.',
     check: (context) => !context.eccsEnabled,
   },
   {
     id: 'safety-override',
-    step: '06',
+    step: '08',
     title: 'SCHUTZBLOCKIERUNG UND OZR PRÜFEN',
-    instruction: `BAZ-Blockierung bestätigt; OZR muss oberhalb ${PHYSICS.OZR_MINIMUM_SAFE} Stabäquivalente bleiben, unter ${PHYSICS.OZR_WARNING} ist bereits Warnbereich.`,
-    check: (context) => !context.bazArmed && context.reactivityMargin >= PHYSICS.OZR_MINIMUM_SAFE,
+    instruction: `BAZ-Blockierung bestätigt; OZR liegt im Warnbereich, aber noch oberhalb ${PHYSICS.OZR_MINIMUM_SAFE} Stabäquivalente.`,
+    check: (context) => (
+      !context.bazArmed &&
+      context.reactivityMargin < PHYSICS.OZR_WARNING &&
+      context.reactivityMargin >= PHYSICS.OZR_MINIMUM_SAFE
+    ),
   },
   {
     id: 'begin-rundown',
-    step: '07',
+    step: '09',
     title: 'DAMPF ZU TG-8 ABSPERREN',
     instruction: 'Dampfzufuhr zum Turbogenerator Nr. 8 vollständig schließen und den Auslauf einleiten.',
     check: (context) => context.turbineConnected && context.turbineValveOpen === 0,
   },
   {
     id: 'observe-rundown',
-    step: '08',
+    step: '10',
     title: 'AUSLAUF KONTROLLIERT BEOBACHTEN',
     instruction: `Auslauf mindestens ${RUNDOWN_OBSERVATION_SECONDS} Sekunden beobachten und dabei Leistung nahe ${PHYSICS.TEST_POWER_TARGET} MW(th) sowie Kühlfluss oberhalb von ${PHYSICS.BAZ_COOLANT_FLOW_MIN} L/s halten.`,
     check: (context) => (
@@ -119,7 +143,7 @@ const CHECKLIST: ChecklistItem[] = [
   },
   {
     id: 'test-complete',
-    step: '09',
+    step: '11',
     title: 'MESSREIHE BIS ZUM TESTENDE FORTFÜHREN',
     instruction: 'Generatorauslauf weiter überwachen, Protokoll abschließen und Reaktor bis zum offiziellen Testende beherrschen.',
     check: (context) => context.testCompleted && !context.isExploded,

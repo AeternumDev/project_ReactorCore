@@ -11,14 +11,14 @@ import { calculateScore } from "./scoring";
 const INITIAL_NEUTRON_FLUX = PHYSICS.TEST_POWER_TARGET / PHYSICS.NOMINAL_POWER;
 
 export const INITIAL_STATE: ReactorState = {
-  controlRods: 26,
+  controlRods: 31,
   activeCoolantPumps: 8,
   eccsEnabled: false,
   coolantFlowRate: 8 * PHYSICS.COOLANT_FLOW_PER_PUMP,
 
-  // Stabgruppen um 01:15:47: niedriger OZR, aber noch knapp oberhalb der
-  // Sofortabschaltgrenze. Die letzten Minuten koennen den OZR in den Unfallbereich ziehen.
-  manualRods: 14,
+  // Stabgruppen bei der geplanten 700-MW-Stabilisierung: OZR knapp oberhalb
+  // des Warnbereichs. Die Xenon-Nachwirkung zwingt den Spieler zur Ausfahrt.
+  manualRods: 19,
   autoRods: 4,
   shortenedRods: 4,
   safetyRods: 4,
@@ -49,19 +49,19 @@ export const INITIAL_STATE: ReactorState = {
   turbineValveOpen: 80,
   turbineAuto: false,
   turbineSpeed: PHYSICS.TURBINE_NOMINAL_SPEED,
-  generatorOutput: 52,
+  generatorOutput: 185,
 
   // Trommelabscheider
   drumSeparatorLevel: 50,
   feedWaterFlow: PHYSICS.FEED_WATER_NOMINAL,
   feedWaterAuto: false,
 
-  // Leistungsregelung — realer Zustand in den letzten Minuten: ca. 200 MW
+  // Leistungsregelung — Sollwert des Turbogenerator-Auslauftests: 700 MW
   powerMode: 'manual',
   powerSetpoint: PHYSICS.TEST_POWER_TARGET,
 
-  // OZR — niedriger historischer Warnbereich, aber noch nicht die 8-Stab-Endlage
-  reactivityMargin: 26,
+  // OZR — knapp oberhalb Warnbereich, aber durch Xenon schnell aufgezehrt
+  reactivityMargin: 31,
 
   // BAZ (historisch: war deaktiviert/blockiert durch Bediener)
   bazArmed: false,
@@ -79,6 +79,7 @@ export const INITIAL_STATE: ReactorState = {
   lastPowerLevel: PHYSICS.TEST_POWER_TARGET,
 
   az5Active: false,
+  az5Triggered: false,
   az5Timer: 0,
   az5PrePower: 0,
   az5PreMargin: 0,
@@ -168,6 +169,7 @@ export function gameReducer(state: ReactorState, action: GameAction): ReactorSta
       };
 
     case 'TRIGGER_AZ5':
+      if (state.az5Triggered) return state;
       return { ...state, ...triggerAZ5(state) };
 
     case 'TOGGLE_BAZ':

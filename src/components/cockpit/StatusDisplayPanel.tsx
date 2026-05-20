@@ -16,6 +16,7 @@ interface StatusDisplayPanelProps {
   reactivityMargin: number;
   controlRods: number;
   manualRods: number;
+  az5Triggered: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -105,18 +106,22 @@ export default function StatusDisplayPanel({
   neutronFlux,
   generatorOutput,
   reactivityMargin,
+  az5Triggered,
 }: StatusDisplayPanelProps) {
   const remaining = PHYSICS.TEST_DURATION_SECONDS - elapsedSeconds;
   const isLastMinute = remaining <= 60 && remaining > 0;
 
   // --- Operator guidance ---
   function getGuidanceMessage(): { text: string; color: string } {
+    if (az5Triggered) {
+      return { text: `AZ-5 AUSGELÖST — TRANSIENT UND KÜHLUNG ÜBERWACHEN`, color: 'var(--alarm-red)' };
+    }
     if (thermalPower <= PHYSICS.XENON_STALL_POWER) {
       return { text: `REAKTOR GESTALLT — VORSCHRIFT ERWARTET AZ-5`, color: 'var(--alarm-red)' };
     }
     if (thermalPower < PHYSICS.TEST_POWER_MIN) {
       if (xenonConcentration > PHYSICS.XENON_WARNING_CONCENTRATION) {
-        return { text: `LEISTUNG UNTER ${PHYSICS.TEST_POWER_TARGET} MW — XENON HOCH, MR NUR SCHRITTWEISE AUSFAHREN`, color: 'var(--warning-yellow)' };
+        return { text: `LEISTUNG UNTER ${PHYSICS.TEST_POWER_TARGET} MW — XENON DRÜCKT, MR/USP AUSFAHREN SENKT OZR`, color: 'var(--warning-yellow)' };
       }
       return { text: `LEISTUNG UNTER ${PHYSICS.TEST_POWER_TARGET} MW — MR-STÄBE VORSICHTIG AUSFAHREN`, color: 'var(--warning-yellow)' };
     }

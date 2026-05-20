@@ -7,8 +7,8 @@ import { PHYSICS } from '@/lib/physics/constants';
 type GamePhase = 'briefing' | 'playing';
 
 const BRIEFING_TEXT = [
-  `Startzeit ist ${PHYSICS.HISTORICAL_START_CLOCK}: etwa acht Minuten vor der Explosion. Der Reaktor ist bereits auf rund ${PHYSICS.TEST_POWER_TARGET} MW gefallen und wurde nach dem fast vollständigen Leistungsabsturz wieder hochgezogen.`,
-  'Die Xenon-Vergiftung ist nicht mehr ein zukünftiges Ereignis, sondern Anfangsbedingung. Iod-135 ist nach der langen Leistungsabsenkung reduziert, Xenon-135 liegt hoch, und der operative Reaktivitätsvorrat befindet sich nur noch im Warnbereich.',
+  `Startzeit ist ${PHYSICS.HISTORICAL_START_CLOCK}: der geplante Turbogenerator-Testbereich liegt bei rund ${PHYSICS.TEST_POWER_TARGET} MW. Der Kern ist bereits xenonvergiftet; sobald die Leistung unter diesen Bereich rutscht, wird jede Erholung schwieriger.`,
+  'Die Xenon-Vergiftung ist nicht mehr ein zukünftiges Ereignis, sondern Anfangsbedingung. Iod-135 ist nach der langen Leistungsabsenkung reduziert, Xenon-135 liegt hoch, und zusätzliche Stabausfahrt frisst den operativen Reaktivitätsvorrat auf.',
   'SAOR/ECCS ist für den Test isoliert und die relevante Schutzblockierung ist gesetzt. Diese Anzeigen sind historische Testkonfigurationen; akut gefährlich wird der Zustand erst, wenn OZR, Void, Kühlfluss oder Leistung weiter entgleisen.',
 ];
 
@@ -196,7 +196,7 @@ export default function GamePage() {
             <ul style={{ paddingLeft: '18px', margin: 0 }}>
               <li>
                 Leistungsabsenkung von 3200 → ~1600 MW, lange Haltephase wegen Lastverteiler,
-                danach weiterer Abfall bis fast Null und Wiederanfahren auf ~200 MW.
+                danach Rückkehr zum geplanten ~700-MW-Testbereich, erneuter Xenon-Abfall und späteres Wiederanfahren aus sehr niedriger Leistung.
               </li>
               <li>
                 Xenon-135 war im Niedrigleistungszustand stark wirksam; die Operatoren zogen

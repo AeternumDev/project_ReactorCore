@@ -6,11 +6,11 @@ export const PHYSICS = {
   MAX_THERMAL_POWER: 4000,
   NOMINAL_POWER: 3200,
   DECAY_HEAT_FLOOR: 16,
-  TEST_POWER_TARGET: 200,           // Realer Leistungsbereich vor dem TG-8-Auslauf
-  TEST_POWER_TOLERANCE: 50,         // Spielbarer Haltekorridor um den 200-MW-Zustand
-  TEST_POWER_MIN: 150,              // Untere Grenze des Haltekorridors
-  TEST_POWER_MAX: 250,              // Obere Grenze des Haltekorridors
-  DANGER_POWER_LEVEL: 200,          // Katastrophenniveau — hohe Effizienz, hohe Gefahr
+  TEST_POWER_TARGET: 700,           // Geplanter TG-8-Testbereich vor dem Xenon-Leistungsabfall
+  TEST_POWER_TOLERANCE: 50,         // Spielbarer Haltekorridor um den 700-MW-Zustand
+  TEST_POWER_MIN: 650,              // Untere Grenze des Haltekorridors
+  TEST_POWER_MAX: 750,              // Obere Grenze des Haltekorridors
+  DANGER_POWER_LEVEL: 200,          // Tiefes Xenon-Pit-Niveau nach fehlgeschlagener Stabilisierung
   XENON_STALL_POWER: 30,            // Leistungsboden bei schwerer Xenon-Vergiftung
   TEST_DURATION_SECONDS: 480,
   HISTORICAL_START_CLOCK: "01:15:47",
@@ -29,17 +29,18 @@ export const PHYSICS = {
     { beta: 0.000273, lambda: 3.01 },
   ] as const,
   TOTAL_DELAYED_NEUTRON_FRACTION: 0.006502,
-  // Die Session startet bereits im vergifteten Niedrigleistungszustand. Iod/Xenon
-  // laufen deshalb in Echtzeit; die vorangegangenen Stunden stecken im Initialzustand.
+  // Die Session startet bereits im vergifteten Testzustand. Iod/Xenon laufen in
+  // Echtzeit; die vorangegangenen Stunden stecken im Initialzustand.
   POISON_TIME_SCALE: 1,
 
   // Reaktivitätsbeiträge (delta-k/k)
   // BASE_EXCESS_REACTIVITY enthält die Xe-Kompensation, ist aber auf den realen
-  // Startzustand kalibriert: ~200 MW, Xe≈1,45 und OZR≈26 Stabäquivalente.
+  // Startzustand kalibriert: ~700 MW, Xe≈1,45 und OZR≈31 Stabäquivalente.
   BASE_EXCESS_REACTIVITY: 0.041,
   TOTAL_ROD_WORTH: 0.036,
   DOPPLER_COEFFICIENT: -0.000011,
   COOLANT_DENSITY_COEFFICIENT: -0.00003,
+  XENON_LOW_POWER_REACTIVITY_DRAG: 0.0018,
 
   // Steuerstäbe
   MAX_CONTROL_RODS: 211,
@@ -134,7 +135,7 @@ export const PHYSICS = {
   // sodass die oberen Kanalabschnitte sieden, lange bevor die mittlere Kühlmittel-
   // temperatur die Sättigung erreicht. Das Bulk-Modell unterschätzt diesen Effekt –
   // diese Verstärkung bildet das Kanal-Austritts-Sieden bei Pumpenausfall ab.
-  FLOW_INDUCED_VOID_GAIN: 0.65,
+  FLOW_INDUCED_VOID_GAIN: 0.82,
 
   // AZ-5 Graphit-Spitzen-Effekt (5 Sekunden — "Point of No Return")
   AZ5_GRAPHIT_SPIKE_DURATION: 5,
@@ -142,6 +143,9 @@ export const PHYSICS = {
   AZ5_LOW_ORM_MULTIPLIER: 5.0,      // Verstärkter Spike wenn ORM < 15 ("un-trippable")
   AZ5_GRAPHITE_BASE_REACTIVITY: 0.012,
   AZ5_GRAPHITE_LOW_ORM_REACTIVITY: 0.02,
+  AZ5_DIRECT_VOID_GAIN: 0.42,
+  AZ5_XENON_BYPASS_FRACTION: 0.95,
+  AZ5_PROMPT_FUEL_HEATING_GAIN: 8,
   AZ5_GRAPHIT_POWER_THRESHOLD: 700,  // Unterhalb davon wird der Tip-Effekt relevant
   AZ5_GRAPHIT_MARGIN_THRESHOLD: 30,  // Niedrige OZR macht den positiven Scram gefaehrlich
   AZ5_GRAPHIT_VOID_THRESHOLD: 0.08,  // Bedeutende Void-Bildung im Kern vor AZ-5
@@ -188,8 +192,8 @@ export const PHYSICS = {
   SCORE_PENALTY_PER_ALARM: 200,
   SCORE_BONUS_TEST_SUCCESS: 3000,
   SCORE_BONUS_ECCS_DISABLED: 500,
-  SCORE_BONUS_STABLE_LOW_POWER: 1500, // Bonus fuer stabile Leistung im historischen Bereich
-  SCORE_BONUS_DANGER_ZONE: 0,        // 200 MW ist jetzt der Start-/Zielzustand, kein Zusatzbonus
+  SCORE_BONUS_STABLE_LOW_POWER: 1500, // Bonus fuer stabile Leistung im Testbereich
+  SCORE_BONUS_DANGER_ZONE: 0,        // Tiefes Xenon-Pit-Niveau ist Unfallfalle, kein Bonus
 
   // Tick-Rate
   TICK_INTERVAL_MS: 500,

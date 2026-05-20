@@ -192,7 +192,7 @@ export default function ReactorCockpit() {
           </div>
 
           <AZ5Button
-            az5Active={state.az5Active}
+            az5Triggered={state.az5Triggered}
             thermalPower={state.thermalPower}
             reactivityMargin={state.reactivityMargin}
             dispatch={dispatch}
@@ -325,6 +325,7 @@ export default function ReactorCockpit() {
             reactivityMargin={state.reactivityMargin}
             controlRods={state.controlRods}
             manualRods={state.manualRods}
+            az5Triggered={state.az5Triggered}
           />
 
           <ReactivityPanel

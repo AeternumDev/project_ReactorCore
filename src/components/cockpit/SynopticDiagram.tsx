@@ -670,10 +670,12 @@ export default function SynopticDiagram({
             <animate attributeName="opacity" values="0.6;0.1;0.6" dur="0.8s" repeatCount="indefinite" />
           </line>
         )}
-        <text x={GEN.x + GEN.w / 2 + 32} y={GEN.y - 4}
+        <text x={GEN.x + GEN.w / 2 + 28} y={GEN.y - 4}
+          textAnchor="middle"
           fill={generatorOutput > 10 ? 'var(--warning-yellow)' : '#555'}
           fontSize="9" fontFamily="monospace">⚡</text>
-        <text x={GEN.x + GEN.w / 2 + 32} y={GEN.y + 7}
+        <text x={GEN.x + GEN.w / 2 + 28} y={GEN.y + 7}
+          textAnchor="middle"
           fill={generatorOutput > 10 ? 'var(--warning-yellow)' : '#555'}
           fontSize="5" fontFamily="monospace">NETZ</text>
 

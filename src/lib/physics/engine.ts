@@ -286,7 +286,17 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     );
   }
 
-  if (Math.min(state.thermalPower, thermalPower) <= PHYSICS.XENON_STALL_POWER && !state.az5Active) {
+  if (thermalPower < PHYSICS.TEST_POWER_MIN && state.thermalPower >= PHYSICS.TEST_POWER_MIN) {
+    addEventIfNew(
+      events,
+      elapsed,
+      `LEISTUNGSABFALL UNTER TESTBEREICH — ${Math.round(thermalPower)} MW, Xenon kompensiert die Stabausfahrt`,
+      "warning",
+      "power-below-test-target",
+    );
+  }
+
+  if (Math.min(state.thermalPower, thermalPower) <= PHYSICS.XENON_STALL_POWER && !state.az5Triggered) {
     addEventIfNew(
       events,
       elapsed,
@@ -366,6 +376,7 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     lastPowerLevel: thermalPower,
     xenonBuildupRate: core.iodineConcentration - core.xenonConcentration,
     az5Active,
+    az5Triggered: state.az5Triggered,
     az5Timer,
     controlRods: finalControlRods,
     manualRods,
@@ -391,6 +402,10 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
  * unter instabilen Niedrigleistungsbedingungen gefaehrlich.
  */
 export function triggerAZ5(state: ReactorState): Partial<ReactorState> {
+  if (state.az5Triggered) {
+    return {};
+  }
+
   const events = [...state.events];
   const currentControlRods = Math.round(
     state.manualRods + state.autoRods + state.shortenedRods + state.safetyRods
@@ -406,6 +421,7 @@ export function triggerAZ5(state: ReactorState): Partial<ReactorState> {
   // Die Stabposition wird in calculateNextState schrittweise erhöht
   return {
     az5Active: true,
+    az5Triggered: true,
     az5Timer: PHYSICS.AZ5_FULL_INSERTION_TIME,
     az5PrePower: state.thermalPower,
     az5PreMargin: currentControlRods,
@@ -468,6 +484,42 @@ function calculateAz5GraphiteTipReactivity(state: ReactorState, az5Timer: number
     : PHYSICS.AZ5_GRAPHITE_BASE_REACTIVITY;
 
   return peakReactivity * spikeSeverity * spikePhase;
+}
+
+function calculateAz5DirectVoidTarget(state: ReactorState, graphiteTipReactivity: number): number {
+  if (!state.az5Active || state.az5Timer <= 0 || graphiteTipReactivity <= 0) {
+    return 0;
+  }
+
+  const normalizedSpike = clamp01(
+    graphiteTipReactivity / PHYSICS.AZ5_GRAPHITE_LOW_ORM_REACTIVITY
+  );
+  const xenonSeverity = clamp01(
+    (state.xenonConcentration - PHYSICS.XENON_WARNING_CONCENTRATION) /
+    (PHYSICS.XENON_SEVERE_CONCENTRATION - PHYSICS.XENON_WARNING_CONCENTRATION)
+  );
+
+  return clamp01(normalizedSpike * PHYSICS.AZ5_DIRECT_VOID_GAIN * (0.7 + xenonSeverity * 0.3));
+}
+
+function calculateAz5PromptHeatupMultiplier(
+  state: ReactorState,
+  graphiteTipReactivity: number,
+  powerMW: number
+): number {
+  if (!state.az5Active || state.az5Timer <= 0 || graphiteTipReactivity <= 0) {
+    return 1;
+  }
+
+  const spikeSeverity = clamp01(
+    graphiteTipReactivity / PHYSICS.AZ5_GRAPHITE_LOW_ORM_REACTIVITY
+  );
+  const powerSeverity = clamp01(
+    (powerMW - PHYSICS.TEST_POWER_TARGET) /
+    (PHYSICS.PEAK_EXCURSION_POWER - PHYSICS.TEST_POWER_TARGET)
+  );
+
+  return 1 + spikeSeverity * powerSeverity * PHYSICS.AZ5_PROMPT_FUEL_HEATING_GAIN;
 }
 
 function clamp01(value: number): number {
@@ -697,12 +749,21 @@ function integrateCoreDynamics(state: ReactorState, control: CoreControlState): 
     const coolantTarget = calculateCoolantTarget(powerMW, effectiveCooling);
     const pressureEstimate = calculateSteamPressure(powerMW, core.steamVoidFraction, effectiveCooling);
     const saturationTemperature = calculateSaturationTemperature(pressureEstimate);
-    const voidTarget = calculateVoidTarget(
-      coolantTarget,
-      saturationTemperature,
-      powerMW,
-      effectiveCooling,
-      state.az5Active && state.az5Timer > 0 ? state.az5PreVoid : core.steamVoidFraction
+    const graphiteTipReactivity = calculateAz5GraphiteTipReactivity(state, state.az5Timer);
+    const promptHeatupMultiplier = calculateAz5PromptHeatupMultiplier(
+      state,
+      graphiteTipReactivity,
+      powerMW
+    );
+    const voidTarget = Math.max(
+      calculateVoidTarget(
+        coolantTarget,
+        saturationTemperature,
+        powerMW,
+        effectiveCooling,
+        state.az5Active && state.az5Timer > 0 ? state.az5PreVoid : core.steamVoidFraction
+      ),
+      calculateAz5DirectVoidTarget(state, graphiteTipReactivity)
     );
     const thermalTargets = calculateThermalTargets(powerMW, effectiveCooling, core.coolantTemperature);
     const totalReactivity = calculateTotalReactivity(state, control, core, powerMW);
@@ -765,7 +826,7 @@ function integrateCoreDynamics(state: ReactorState, control: CoreControlState): 
       PHYSICS.FUEL_TEMP_NOMINAL,
       core.fuelTemperature +
         ((thermalTargets.fuelTemperature - core.fuelTemperature) /
-          PHYSICS.FUEL_CENTER_TIME_CONSTANT) *
+          (PHYSICS.FUEL_CENTER_TIME_CONSTANT / promptHeatupMultiplier)) *
           subDt
     );
   }
@@ -788,22 +849,49 @@ function calculateTotalReactivity(
       (PHYSICS.LOW_POWER_VOID_AMPLIFICATION - 1) * (powerReference / PHYSICS.TEST_POWER_TARGET)
   );
   const voidReactivity = core.steamVoidFraction * PHYSICS.VOID_COEFFICIENT * lowPowerFactor;
-  const xenonReactivity = -core.xenonConcentration * PHYSICS.XENON_MAX_REACTIVITY_PENALTY;
+  const graphiteTipReactivity = calculateAz5GraphiteTipReactivity(state, state.az5Timer);
+  const az5PoisonBypass = state.az5Active
+    ? clamp01(
+        graphiteTipReactivity / PHYSICS.AZ5_GRAPHITE_LOW_ORM_REACTIVITY
+      ) * PHYSICS.AZ5_XENON_BYPASS_FRACTION
+    : 0;
+  const xenonReactivity =
+    -core.xenonConcentration * PHYSICS.XENON_MAX_REACTIVITY_PENALTY * (1 - az5PoisonBypass);
+  const xenonLowPowerDrag = calculateXenonLowPowerDrag(state, core, powerMW);
   const dopplerReactivity =
     (core.fuelTemperature - PHYSICS.FUEL_TEMP_NOMINAL) * PHYSICS.DOPPLER_COEFFICIENT;
   const coolantDensityReactivity =
     (core.coolantTemperature - PHYSICS.COOLANT_TEMP_NOMINAL) * PHYSICS.COOLANT_DENSITY_COEFFICIENT;
-  const graphiteTipReactivity = calculateAz5GraphiteTipReactivity(state, state.az5Timer);
-
   return (
     PHYSICS.BASE_EXCESS_REACTIVITY +
     rodReactivity +
     voidReactivity +
     xenonReactivity +
+    xenonLowPowerDrag +
     dopplerReactivity +
     coolantDensityReactivity +
     graphiteTipReactivity
   );
+}
+
+function calculateXenonLowPowerDrag(
+  state: ReactorState,
+  core: CoreDynamicsState,
+  powerMW: number
+): number {
+  if (state.az5Active) {
+    return 0;
+  }
+
+  const belowTargetSeverity = clamp01(
+    (PHYSICS.TEST_POWER_TARGET - powerMW) / PHYSICS.TEST_POWER_TARGET
+  );
+  const poisonSeverity = clamp01(
+    (core.xenonConcentration - PHYSICS.XENON_WARNING_CONCENTRATION) /
+    (PHYSICS.XENON_SEVERE_CONCENTRATION - PHYSICS.XENON_WARNING_CONCENTRATION)
+  );
+
+  return -PHYSICS.XENON_LOW_POWER_REACTIVITY_DRAG * belowTargetSeverity * poisonSeverity;
 }
 
 function calculateCoolantTarget(powerMW: number, effectiveCooling: number): number {

@@ -63,6 +63,7 @@ export interface ReactorState {
 
   // AZ-5 internes Tracking
   az5Active: boolean;
+  az5Triggered: boolean;
   az5Timer: number;
   az5PrePower: number;
   az5PreMargin: number;       // OZR-Stababsenkung zum Zeitpunkt der AZ-5-Auslösung

@@ -93,24 +93,22 @@ export default function Home() {
 
           <p style={{ marginBottom: '8px' }}>
             <span style={{ color: 'var(--warning-yellow)' }}>AUSGANGSLAGE:</span>{' '}
-            Die Simulation beginnt acht Minuten vor der Explosion. Reaktor 4 läuft nicht mehr im
-            geplanten 700&nbsp;MW-Testbereich, sondern bereits im historisch erreichten Niedrigleistungszustand
-            um <strong style={{ color: '#fff' }}>{PHYSICS.TEST_POWER_TARGET}&nbsp;MW</strong>. Die vorangegangene
-            Leistungsabsenkung steckt schon im Kern: Xenon-135 ist hoch, Iod-135 fällt ab, und der OZR
-            liegt nur noch im Warnbereich.
+            Die Simulation beginnt im geplanten 700&nbsp;MW-Testbereich kurz vor dem Auslauftest.
+            Die vorangegangene Leistungsabsenkung steckt schon im Kern: Xenon-135 ist hoch,
+            Iod-135 fällt ab, und der OZR liegt nur knapp oberhalb des Warnbereichs.
           </p>
 
           <p style={{ marginBottom: '8px' }}>
             <span style={{ color: 'var(--amber)' }}>ZIEL:</span>{' '}
-            Halte den Reaktor im Bereich von <strong style={{ color: '#fff' }}>{PHYSICS.TEST_POWER_MIN}–{PHYSICS.TEST_POWER_MAX}&nbsp;MW</strong>,
-            ohne den OZR unter die Abschaltgrenze zu ziehen. TG-8 läuft noch; der Auslauf beginnt erst,
+            Versuche den Reaktor im Bereich von <strong style={{ color: '#fff' }}>{PHYSICS.TEST_POWER_MIN}–{PHYSICS.TEST_POWER_MAX}&nbsp;MW</strong>
+            zu halten, während Xenon die Leistung nach unten zieht. TG-8 läuft noch; der Auslauf beginnt erst,
             wenn die Dampfzufuhr geschlossen und der Rundown-Bus auf TG-8 gelegt wird.
           </p>
 
           <div style={{ marginBottom: '8px' }}>
             <span style={{ color: 'var(--amber)' }}>ERSTE MASSNAHMEN:</span>
             <ol style={{ paddingLeft: '18px', marginTop: '4px' }}>
-              <li>Leistung bei etwa {PHYSICS.TEST_POWER_TARGET}&nbsp;MW stabil halten; keine sprunghaften Stabbewegungen.</li>
+              <li>Leistung bei etwa {PHYSICS.TEST_POWER_TARGET}&nbsp;MW beobachten; der Xenon-Pit kann sie trotz Gegenmaßnahmen sinken lassen.</li>
               <li>OZR-Anzeige beobachten — <span style={{ color: 'var(--alarm-red)' }}>unter {PHYSICS.OZR_MINIMUM_SAFE} Stäben OZR: Abschaltgrenze.</span></li>
               <li>SAOR/ECCS und BAZ-Blockierung als historische Testkonfiguration erkennen, nicht als akute Startkatastrophe.</li>
               <li>Vor dem Auslauf TG-8, Speisewasser, Trommelstand und Kühlfluss prüfen.</li>
@@ -126,7 +124,7 @@ export default function Home() {
           <p>
             <span style={{ color: 'var(--safe-green)' }}>ERFOLG:</span>{' '}
             Acht Minuten Echtzeit ohne Leistungsdurchgang, Dampfblasen-Eskalation oder OZR-Verlust.
-            Die historische Falle ist bereits aufgebaut; die Aufgabe ist, sie nicht auszulösen.
+            Die historische Falle baut sich während der Bedienhandlungen auf; die Anzeigen zeigen, wie eng der Spielraum wird.
           </p>
         </div>
 

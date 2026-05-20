@@ -38,66 +38,92 @@ describe('buildChecklistProgress', () => {
     );
 
     expect(checklist[0]).toMatchObject({ id: 'power-band', status: 'active', conditionMet: false });
-    expect(checklist[4]).toMatchObject({ id: 'eccs-disconnect', status: 'pending', conditionMet: true });
-    expect(checklist[5]).toMatchObject({ id: 'safety-override', status: 'pending', conditionMet: true });
+    expect(checklist[6]).toMatchObject({ id: 'eccs-disconnect', status: 'pending', conditionMet: true });
+    expect(checklist[7]).toMatchObject({ id: 'safety-override', status: 'pending', conditionMet: false });
   });
 
-  it('holds the power stabilization step active until the full dwell time is met', () => {
+  it('moves from xenon slip into low-OZR recovery after the initial target was reached', () => {
     const completed = advanceChecklistCompletion(
-      baseProps,
-      { stablePowerSeconds: POWER_HOLD_SECONDS - 1, rundownSeconds: 0 },
+      { ...baseProps, thermalPower: 600 },
+      { stablePowerSeconds: 0, rundownSeconds: 0 },
+      ['power-band'],
     );
 
     const checklist = buildChecklistProgress(
-      baseProps,
-      { stablePowerSeconds: POWER_HOLD_SECONDS - 1, rundownSeconds: 0 },
+      { ...baseProps, thermalPower: 600 },
+      { stablePowerSeconds: 0, rundownSeconds: 0 },
       completed,
     );
 
-    expect(checklist[0]).toMatchObject({ id: 'power-band', status: 'completed', conditionMet: true });
-    expect(checklist[1]).toMatchObject({ id: 'power-hold', status: 'active', conditionMet: false });
+    expect(checklist[0]).toMatchObject({ id: 'power-band', status: 'completed', conditionMet: false });
+    expect(checklist[1]).toMatchObject({ id: 'xenon-slip', status: 'completed', conditionMet: true });
+    expect(checklist[2]).toMatchObject({ id: 'low-ozr-recovery', status: 'active', conditionMet: false });
+  });
+
+  it('holds the power stabilization step active until the full dwell time is met', () => {
+    const completedIds = ['power-band', 'xenon-slip', 'low-ozr-recovery'];
+
+    const checklist = buildChecklistProgress(
+      { ...baseProps, reactivityMargin: 20 },
+      { stablePowerSeconds: POWER_HOLD_SECONDS - 1, rundownSeconds: 0 },
+      completedIds,
+    );
+
+    expect(checklist[3]).toMatchObject({ id: 'power-hold', status: 'active', conditionMet: false });
   });
 
   it('requires a real rundown observation before opening the final test-end step', () => {
-    const preRundownCompleted = advanceChecklistCompletion(
-      baseProps,
-      { stablePowerSeconds: POWER_HOLD_SECONDS, rundownSeconds: 0 },
-    );
+    const preRundownCompleted = [
+      'power-band',
+      'xenon-slip',
+      'low-ozr-recovery',
+      'power-hold',
+      'turbine-ready',
+      'water-regime',
+      'eccs-disconnect',
+      'safety-override',
+    ];
 
     const checklist = buildChecklistProgress(
-      { ...baseProps, turbineValveOpen: 0 },
+      { ...baseProps, reactivityMargin: 20, turbineValveOpen: 0 },
       { stablePowerSeconds: POWER_HOLD_SECONDS, rundownSeconds: RUNDOWN_OBSERVATION_SECONDS - 1 },
       preRundownCompleted,
     );
 
-    expect(checklist[6]).toMatchObject({ id: 'begin-rundown', status: 'completed', conditionMet: true });
-    expect(checklist[7]).toMatchObject({ id: 'observe-rundown', status: 'active', conditionMet: false });
-    expect(checklist[8]).toMatchObject({ id: 'test-complete', status: 'pending', conditionMet: false });
+    expect(checklist[8]).toMatchObject({ id: 'begin-rundown', status: 'completed', conditionMet: true });
+    expect(checklist[9]).toMatchObject({ id: 'observe-rundown', status: 'active', conditionMet: false });
+    expect(checklist[10]).toMatchObject({ id: 'test-complete', status: 'pending', conditionMet: false });
   });
 
   it('unlocks the final step after a valid rundown and completes only when the test ends', () => {
-    const preRundownCompleted = advanceChecklistCompletion(
-      baseProps,
-      { stablePowerSeconds: POWER_HOLD_SECONDS, rundownSeconds: 0 },
-    );
+    const preRundownCompleted = [
+      'power-band',
+      'xenon-slip',
+      'low-ozr-recovery',
+      'power-hold',
+      'turbine-ready',
+      'water-regime',
+      'eccs-disconnect',
+      'safety-override',
+    ];
 
     const preCompletion = buildChecklistProgress(
-      { ...baseProps, turbineValveOpen: 0 },
+      { ...baseProps, reactivityMargin: 20, turbineValveOpen: 0 },
       { stablePowerSeconds: POWER_HOLD_SECONDS, rundownSeconds: RUNDOWN_OBSERVATION_SECONDS },
       preRundownCompleted,
     );
 
-    expect(preCompletion[7]).toMatchObject({ id: 'observe-rundown', status: 'completed', conditionMet: true });
-    expect(preCompletion[8]).toMatchObject({ id: 'test-complete', status: 'active', conditionMet: false });
+    expect(preCompletion[9]).toMatchObject({ id: 'observe-rundown', status: 'completed', conditionMet: true });
+    expect(preCompletion[10]).toMatchObject({ id: 'test-complete', status: 'active', conditionMet: false });
 
     const beforeCompletionIds = advanceChecklistCompletion(
-      { ...baseProps, turbineValveOpen: 0 },
+      { ...baseProps, reactivityMargin: 20, turbineValveOpen: 0 },
       { stablePowerSeconds: POWER_HOLD_SECONDS, rundownSeconds: RUNDOWN_OBSERVATION_SECONDS },
       preRundownCompleted,
     );
 
     const completed = buildChecklistProgress(
-      { ...baseProps, turbineValveOpen: 0, testCompleted: true },
+      { ...baseProps, reactivityMargin: 20, turbineValveOpen: 0, testCompleted: true },
       { stablePowerSeconds: POWER_HOLD_SECONDS, rundownSeconds: RUNDOWN_OBSERVATION_SECONDS },
       beforeCompletionIds,
     );

@@ -33,7 +33,7 @@ export function calculateScore(state: ReactorState): number {
     score += PHYSICS.SCORE_BONUS_STABLE_LOW_POWER;
   }
 
-  // Risiko/Belohnung: Danger Zone (~200 MW) gibt Effizienz-Bonus, aber extrem volatil
+  // Tiefes Xenon-Pit-Niveau bleibt als Unfallfalle markiert, gibt aber keinen Bonus.
   if (
     state.thermalPower >= PHYSICS.DANGER_POWER_LEVEL - 50 &&
     state.thermalPower <= PHYSICS.DANGER_POWER_LEVEL + 100

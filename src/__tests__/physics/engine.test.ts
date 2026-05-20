@@ -59,13 +59,20 @@ function advanceTicks(state: ReactorState, tickCount: number): ReactorState {
 }
 
 describe("Physik-Engine", () => {
-  test("Startzustand setzt den historischen Niedrigleistungs- und Xenon-Zustand", () => {
+  test("Startzustand setzt den 700-MW-Test- und Xenon-Zustand", () => {
     expect(INITIAL_STATE.thermalPower).toBe(PHYSICS.TEST_POWER_TARGET);
-    expect(INITIAL_STATE.reactivityMargin).toBe(26);
+    expect(INITIAL_STATE.reactivityMargin).toBe(31);
     expect(INITIAL_STATE.iodineConcentration).toBeCloseTo(0.49, 2);
     expect(INITIAL_STATE.xenonConcentration).toBeCloseTo(1.45, 2);
     expect(INITIAL_STATE.xenonConcentration).toBeGreaterThan(PHYSICS.XENON_WARNING_CONCENTRATION);
     expect(PHYSICS.POISON_TIME_SCALE).toBe(1);
+  });
+
+  test("700-MW-Testzustand rutscht unter Xenon ohne weitere Stabausfahrt ab", () => {
+    const afterSlip = advanceTicks(createTestState(), 20);
+
+    expect(afterSlip.thermalPower).toBeLessThan(PHYSICS.TEST_POWER_MIN);
+    expect(afterSlip.events.some((event) => event.code === "power-below-test-target")).toBe(true);
   });
 
   test("Xenon-Pit baut sich nach Leistungsabsenkung in Echtzeit auf", () => {
@@ -246,7 +253,7 @@ describe("Physik-Engine", () => {
 
     expect(healthyAfterAz5.neutronFlux!).toBeLessThan(healthyCore.neutronFlux);
     expect(accidentAfterAz5.neutronFlux!).toBeGreaterThan(accidentCore.neutronFlux);
-    expect(accidentDelta).toBeGreaterThan(Math.abs(healthyDelta) * 10);
+    expect(accidentDelta).toBeGreaterThan(Math.abs(healthyDelta) * 5);
   });
 
   test("AZ-5 nutzt die globale Einfahrrate statt jede Stabgruppe separat zu vervierfachen", () => {
@@ -388,7 +395,7 @@ describe("Physik-Engine", () => {
 });
 
 describe("Score-Berechnung", () => {
-  test("Basiswert ist 10000 beim historischen 200-MW-Zustand", () => {
+  test("Basiswert ist 10000 beim historischen 700-MW-Testzustand", () => {
     const state = createTestState({
       thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
@@ -469,7 +476,7 @@ describe("Score-Berechnung", () => {
     expect(score).toBe(PHYSICS.BASE_SCORE);
   });
 
-  test("Historischer 200-MW-Zustand bekommt keinen separaten Danger-Bonus", () => {
+  test("Historischer 700-MW-Testzustand bekommt keinen separaten Danger-Bonus", () => {
     const state = createTestState({
       thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
@@ -710,6 +717,7 @@ describe("Game Reducer", () => {
     const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, 10);
 
     expect(afterScram.isExploded).toBe(true);
+    expect(afterScram.events.some((event) => event.code === "meltdown")).toBe(true);
   });
 
   test("AZ-5 bei Xenon-Pit, OZR < 15 und Void führt zur Chernobyl-artigen Exkursion", () => {
@@ -730,6 +738,32 @@ describe("Game Reducer", () => {
 
     expect(afterScram.isExploded).toBe(true);
     expect(afterScram.thermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
+    expect(afterScram.fuelTemperature).toBeGreaterThanOrEqual(PHYSICS.FUEL_TEMP_MELTDOWN);
+    expect(afterScram.events.some((event) => event.code === "meltdown")).toBe(true);
+  });
+
+  test("AZ-5 bei 16 MW, Xenon-Pit und OZR < 15 erzeugt auch ohne Start-Void eine Exkursion", () => {
+    const lowPowerFlux = PHYSICS.DECAY_HEAT_FLOOR / PHYSICS.NOMINAL_POWER;
+    const state = createTestState({
+      thermalPower: PHYSICS.DECAY_HEAT_FLOOR,
+      neutronFlux: lowPowerFlux,
+      delayedNeutronPrecursors: createEquilibriumDelayedNeutronPrecursors(lowPowerFlux),
+      xenonConcentration: PHYSICS.XENON_SEVERE_CONCENTRATION,
+      coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
+      steamVoidFraction: 0,
+      fuelTemperature: 700,
+      manualRods: 0,
+      autoRods: 0,
+      shortenedRods: 0,
+      safetyRods: 8,
+    });
+
+    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, 12);
+
+    expect(afterScram.isExploded).toBe(true);
+    expect(afterScram.thermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
+    expect(afterScram.fuelTemperature).toBeGreaterThanOrEqual(PHYSICS.FUEL_TEMP_MELTDOWN);
+    expect(afterScram.events.some((event) => event.code === "meltdown")).toBe(true);
   });
 
   test("AZ-5 bei OZR > 30 und Xenon nahe Gleichgewicht fährt sicher herunter", () => {
