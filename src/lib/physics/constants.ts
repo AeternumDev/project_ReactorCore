@@ -40,7 +40,7 @@ export const PHYSICS = {
   TOTAL_ROD_WORTH: 0.036,
   DOPPLER_COEFFICIENT: -0.000011,
   COOLANT_DENSITY_COEFFICIENT: -0.00003,
-  XENON_LOW_POWER_REACTIVITY_DRAG: 0.0018,
+  XENON_LOW_POWER_REACTIVITY_DRAG: 0.020,
 
   // Steuerstäbe
   MAX_CONTROL_RODS: 211,
@@ -136,15 +136,26 @@ export const PHYSICS = {
   // temperatur die Sättigung erreicht. Das Bulk-Modell unterschätzt diesen Effekt –
   // diese Verstärkung bildet das Kanal-Austritts-Sieden bei Pumpenausfall ab.
   FLOW_INDUCED_VOID_GAIN: 0.82,
+  // Bei stark reduziertem/ausgefallenem Durchfluss kochen einzelne Kanäle auch
+  // bei niedriger gemittelter Leistung: Restwärme + fast stehendes Wasser reicht,
+  // um lokale Dampfblasen zu bilden. Das ist die loss-of-flow-Rückkopplung, die
+  // den RBMK bei Pumpenverlust nicht inert bleiben lässt.
+  LOSS_OF_FLOW_VOID_GAIN: 0.62,
+  LOSS_OF_FLOW_VOID_EXPONENT: 1.7,
 
-  // AZ-5 Graphit-Spitzen-Effekt (5 Sekunden — "Point of No Return")
-  AZ5_GRAPHIT_SPIKE_DURATION: 5,
+  // AZ-5 Graphit-Spitzen-Effekt: im Unfallpfad baut sich der Leistungsanstieg
+  // ueber das AZ-5/Explosionsfenster auf, statt sofort im ersten Tick zu springen.
+  AZ5_GRAPHIT_SPIKE_DURATION: 9,
+  AZ5_GRAPHITE_REACTIVITY_RAMP_EXPONENT: 1.8,
+  AZ5_EXCURSION_POWER_RAMP_EXPONENT: 3,
   AZ5_GRAPHIT_POWER_MULTIPLIER: 2.5,
   AZ5_LOW_ORM_MULTIPLIER: 5.0,      // Verstärkter Spike wenn ORM < 15 ("un-trippable")
   AZ5_GRAPHITE_BASE_REACTIVITY: 0.012,
   AZ5_GRAPHITE_LOW_ORM_REACTIVITY: 0.02,
   AZ5_DIRECT_VOID_GAIN: 0.42,
   AZ5_XENON_BYPASS_FRACTION: 0.95,
+  AZ5_XENON_POWER_THRESHOLD_GAIN: 1.25,
+  AZ5_EXPLOSION_DELAY_SECONDS: 9,
   AZ5_PROMPT_FUEL_HEATING_GAIN: 8,
   AZ5_GRAPHIT_POWER_THRESHOLD: 700,  // Unterhalb davon wird der Tip-Effekt relevant
   AZ5_GRAPHIT_MARGIN_THRESHOLD: 30,  // Niedrige OZR macht den positiven Scram gefaehrlich
@@ -166,7 +177,7 @@ export const PHYSICS = {
   TURBINE_EFFICIENCY: 0.33,        // 33% thermisch → elektrisch
   TURBINE_SPINDOWN_RATE: 50,       // RPM/s Auslauf
   // Leistungsexkursion
-  PEAK_EXCURSION_POWER: 33000,       // Spitzenleistung bei Exkursion (>33.000 MWth Referenz)
+  PEAK_EXCURSION_POWER: 33000,       // Historische Maximalanzeige/Spitzenleistung (~33.000 MWth)
 
   // Kavitation
   CAVITATION_SUBCOOLING_THRESHOLD: 3, // °C Unterkühlung unter der Kavitation beginnt
@@ -188,8 +199,9 @@ export const PHYSICS = {
 
   // Score
   BASE_SCORE: 10000,
-  SCORE_PENALTY_PER_SECOND_OFF_TARGET: 5,
+  SCORE_PENALTY_PER_SECOND_OFF_TARGET: 10,
   SCORE_PENALTY_PER_ALARM: 200,
+  SCORE_PENALTY_PER_CRITICAL: 75,
   SCORE_BONUS_TEST_SUCCESS: 3000,
   SCORE_BONUS_ECCS_DISABLED: 500,
   SCORE_BONUS_STABLE_LOW_POWER: 1500, // Bonus fuer stabile Leistung im Testbereich

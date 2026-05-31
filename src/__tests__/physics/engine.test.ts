@@ -58,6 +58,48 @@ function advanceTicks(state: ReactorState, tickCount: number): ReactorState {
   return current;
 }
 
+function advanceTicksWithPeaks(state: ReactorState, tickCount: number): {
+  state: ReactorState;
+  peakThermalPower: number;
+  peakFuelTemperature: number;
+  peakSteamPressure: number;
+  peakSteamVoidFraction: number;
+  peakCoreTemperature: number;
+} {
+  let current = state;
+  let peakThermalPower = current.thermalPower;
+  let peakFuelTemperature = current.fuelTemperature;
+  let peakSteamPressure = current.steamPressure;
+  let peakSteamVoidFraction = current.steamVoidFraction;
+  let peakCoreTemperature = Math.max(...current.coreTemperatureZones);
+
+  for (let tick = 0; tick < tickCount; tick += 1) {
+    current = {
+      ...current,
+      ...calculateNextState(current),
+      elapsedSeconds: current.elapsedSeconds + PHYSICS.TICK_INTERVAL_MS / 1000,
+    };
+    peakThermalPower = Math.max(peakThermalPower, current.thermalPower);
+    peakFuelTemperature = Math.max(peakFuelTemperature, current.fuelTemperature);
+    peakSteamPressure = Math.max(peakSteamPressure, current.steamPressure);
+    peakSteamVoidFraction = Math.max(peakSteamVoidFraction, current.steamVoidFraction);
+    peakCoreTemperature = Math.max(peakCoreTemperature, ...current.coreTemperatureZones);
+
+    if (current.isExploded) {
+      break;
+    }
+  }
+
+  return {
+    state: current,
+    peakThermalPower,
+    peakFuelTemperature,
+    peakSteamPressure,
+    peakSteamVoidFraction,
+    peakCoreTemperature,
+  };
+}
+
 describe("Physik-Engine", () => {
   test("Startzustand setzt den 700-MW-Test- und Xenon-Zustand", () => {
     expect(INITIAL_STATE.thermalPower).toBe(PHYSICS.TEST_POWER_TARGET);
@@ -73,6 +115,16 @@ describe("Physik-Engine", () => {
 
     expect(afterSlip.thermalPower).toBeLessThan(PHYSICS.TEST_POWER_MIN);
     expect(afterSlip.events.some((event) => event.code === "power-below-test-target")).toBe(true);
+  });
+
+  test("700-MW-Start rutscht schnell, aber nicht in einem Tick, in den Xenon-Stall", () => {
+    const afterFirstTick = advanceTicks(createTestState(), 1);
+    const afterThreeSeconds = advanceTicks(createTestState(), 6);
+
+    expect(afterFirstTick.thermalPower).toBeGreaterThan(500);
+    expect(afterFirstTick.thermalPower).toBeLessThan(PHYSICS.TEST_POWER_TARGET);
+    expect(afterThreeSeconds.thermalPower).toBeLessThan(300);
+    expect(afterThreeSeconds.isExploded).toBe(false);
   });
 
   test("Xenon-Pit baut sich nach Leistungsabsenkung in Echtzeit auf", () => {
@@ -396,94 +448,136 @@ describe("Physik-Engine", () => {
 
 describe("Score-Berechnung", () => {
   test("Basiswert ist 10000 beim historischen 700-MW-Testzustand", () => {
-    const state = createTestState({
+    const previous = createTestState({
       thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
       testCompleted: false,
       eccsEnabled: false,
     });
-    const score = calculateScore(state);
-    expect(score).toBe(PHYSICS.BASE_SCORE);
+    const state = { ...previous, elapsedSeconds: previous.elapsedSeconds + 0.5 };
+    const update = calculateScore(previous, state);
+    expect(update.score).toBe(PHYSICS.BASE_SCORE);
   });
 
-  test("Abzug wenn Leistung außerhalb des historischen Haltekorridors liegt", () => {
-    const state = createTestState({
+  test("Zeitabzug wird pro Tick fortgeschrieben, wenn Leistung außerhalb des Haltekorridors liegt", () => {
+    const previous = createTestState({
       thermalPower: 500, // below target
       events: [],
       testCompleted: false,
     });
-    const score = calculateScore(state);
-    expect(score).toBeLessThan(PHYSICS.BASE_SCORE);
-    expect(score).toBe(PHYSICS.BASE_SCORE - PHYSICS.SCORE_PENALTY_PER_SECOND_OFF_TARGET);
+    const state = { ...previous, elapsedSeconds: previous.elapsedSeconds + 0.5 };
+    const update = calculateScore(previous, state);
+    expect(update.score).toBeLessThan(PHYSICS.BASE_SCORE);
+    expect(update.score).toBe(
+      PHYSICS.BASE_SCORE - PHYSICS.SCORE_PENALTY_PER_SECOND_OFF_TARGET * 0.5
+    );
   });
 
   test("Kein Abzug an der oberen Toleranzgrenze", () => {
-    const state = createTestState({
+    const previous = createTestState({
       thermalPower: PHYSICS.TEST_POWER_MAX,
       events: [],
       testCompleted: false,
     });
-    const score = calculateScore(state);
-    expect(score).toBe(PHYSICS.BASE_SCORE);
+    const state = { ...previous, elapsedSeconds: previous.elapsedSeconds + 0.5 };
+    const update = calculateScore(previous, state);
+    expect(update.score).toBe(PHYSICS.BASE_SCORE);
   });
 
-  test("Bonus bei testCompleted", () => {
-    const state = createTestState({
+  test("Bonus bei testCompleted wird nur beim ersten Abschluss vergeben", () => {
+    const previous = createTestState({
       thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
-      testCompleted: true,
+      testCompleted: false,
       eccsEnabled: true,
     });
-    const score = calculateScore(state);
-    expect(score).toBe(PHYSICS.BASE_SCORE + PHYSICS.SCORE_BONUS_TEST_SUCCESS);
+    const state = { ...previous, testCompleted: true, elapsedSeconds: previous.elapsedSeconds + 0.5 };
+    const firstUpdate = calculateScore(previous, state);
+    const secondUpdate = calculateScore({ ...state, ...firstUpdate }, { ...state, ...firstUpdate, elapsedSeconds: state.elapsedSeconds + 0.5 });
+
+    expect(firstUpdate.score).toBe(PHYSICS.BASE_SCORE + PHYSICS.SCORE_BONUS_TEST_SUCCESS);
+    expect(secondUpdate.score).toBe(firstUpdate.score);
   });
 
   test("Bonus bei !eccsEnabled && testCompleted", () => {
-    const state = createTestState({
+    const previous = createTestState({
       thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
-      testCompleted: true,
+      testCompleted: false,
       eccsEnabled: false,
     });
-    const score = calculateScore(state);
-    expect(score).toBe(
+    const state = { ...previous, testCompleted: true, elapsedSeconds: previous.elapsedSeconds + 0.5 };
+    const update = calculateScore(previous, state);
+    expect(update.score).toBe(
       PHYSICS.BASE_SCORE + PHYSICS.SCORE_BONUS_TEST_SUCCESS + PHYSICS.SCORE_BONUS_ECCS_DISABLED
     );
   });
 
-  test("Stabile-Leistung-Bonus nach 60 s nahe Zielwert", () => {
-    const state = createTestState({
+  test("Stabile-Leistung-Bonus braucht 60 s fortlaufend nahe Zielwert", () => {
+    const previous = createTestState({
       thermalPower: PHYSICS.TEST_POWER_TARGET,
       xenonConcentration: 0.4,
-      elapsedSeconds: 65,
+      elapsedSeconds: 59.5,
       events: [],
       testCompleted: false,
+      scoreStablePowerSeconds: 59.5,
     });
-    const score = calculateScore(state);
-    expect(score).toBe(PHYSICS.BASE_SCORE + PHYSICS.SCORE_BONUS_STABLE_LOW_POWER);
+    const state = { ...previous, elapsedSeconds: 60 };
+    const update = calculateScore(previous, state);
+    expect(update.score).toBe(PHYSICS.BASE_SCORE + PHYSICS.SCORE_BONUS_STABLE_LOW_POWER);
+    expect(update.scoreAwardedStablePowerBonus).toBe(true);
   });
 
   test("Kein Stabile-Bonus bei Xenon-Pit (≥ 1.2)", () => {
-    const state = createTestState({
+    const previous = createTestState({
       thermalPower: PHYSICS.TEST_POWER_TARGET,
       xenonConcentration: 1.5,
-      elapsedSeconds: 65,
+      elapsedSeconds: 59.5,
       events: [],
       testCompleted: false,
+      scoreStablePowerSeconds: 59.5,
     });
-    const score = calculateScore(state);
+    const state = { ...previous, elapsedSeconds: 60 };
+    const update = calculateScore(previous, state);
     // No stable bonus, just base score at the target power.
-    expect(score).toBe(PHYSICS.BASE_SCORE);
+    expect(update.score).toBe(PHYSICS.BASE_SCORE);
+    expect(update.scoreStablePowerSeconds).toBe(0);
   });
 
   test("Historischer 700-MW-Testzustand bekommt keinen separaten Danger-Bonus", () => {
-    const state = createTestState({
+    const previous = createTestState({
       thermalPower: PHYSICS.TEST_POWER_TARGET,
       events: [],
       testCompleted: false,
     });
-    const score = calculateScore(state);
-    expect(score).toBe(PHYSICS.BASE_SCORE);
+    const state = { ...previous, elapsedSeconds: previous.elapsedSeconds + 0.5 };
+    const update = calculateScore(previous, state);
+    expect(update.score).toBe(PHYSICS.BASE_SCORE);
+  });
+
+  test("neue kritische und Alarm-Events werden nur einmal vom Score abgezogen", () => {
+    const previous = createTestState({
+      events: [],
+      scorePenalizedEventCount: 0,
+    });
+    const state = {
+      ...previous,
+      elapsedSeconds: previous.elapsedSeconds + 0.5,
+      events: [
+        { timestamp: 0.5, message: "kritisch", severity: "critical" as const, code: "critical-test" },
+        { timestamp: 0.5, message: "alarm", severity: "alarm" as const, code: "alarm-test" },
+      ],
+    };
+    const firstUpdate = calculateScore(previous, state);
+    const secondUpdate = calculateScore(
+      { ...state, ...firstUpdate },
+      { ...state, ...firstUpdate, elapsedSeconds: state.elapsedSeconds + 0.5 },
+    );
+
+    expect(firstUpdate.score).toBe(
+      PHYSICS.BASE_SCORE - PHYSICS.SCORE_PENALTY_PER_CRITICAL - PHYSICS.SCORE_PENALTY_PER_ALARM
+    );
+    expect(secondUpdate.score).toBe(firstUpdate.score);
   });
 });
 
@@ -554,7 +648,30 @@ describe("Game Reducer", () => {
     expect(afterTrip.pumpStates.every((isCommandedOn) => !isCommandedOn)).toBe(true);
     expect(afterTrip.activeCoolantPumps).toBeLessThan(6);
     expect(afterTrip.steamVoidFraction).toBeGreaterThan(0.01);
+    expect(afterTrip.thermalPower).toBeGreaterThan(INITIAL_STATE.thermalPower);
     expect(afterTrip.fuelTemperature).toBeGreaterThan(initialFuelTemperature);
+  });
+
+  test("Vollständiger HKP-Ausfall im Xenonstall erzeugt Void, Wärme und Leistungsanstieg", () => {
+    let state = advanceTicks(createTestState(), 40);
+
+    state = gameReducer(state, { type: "SET_MANUAL_RODS", payload: 0 });
+    state = gameReducer(state, { type: "SET_AUTO_RODS", payload: 0 });
+    state = gameReducer(state, { type: "SET_SHORTENED_RODS", payload: 0 });
+
+    const stalledPower = state.thermalPower;
+    const stalledFuelTemperature = state.fuelTemperature;
+
+    for (let pumpIndex = 0; pumpIndex < 8; pumpIndex += 1) {
+      state = gameReducer(state, { type: "TOGGLE_PUMP", payload: pumpIndex });
+    }
+
+    const pumpTrip = advanceTicksWithPeaks(state, 60);
+
+    expect(state.pumpStates.every((isCommandedOn) => !isCommandedOn)).toBe(true);
+    expect(pumpTrip.peakSteamVoidFraction).toBeGreaterThan(0.1);
+    expect(pumpTrip.peakThermalPower).toBeGreaterThan(stalledPower * 2);
+    expect(pumpTrip.peakFuelTemperature).toBeGreaterThan(stalledFuelTemperature + 200);
   });
 
   test("TICK wird ignoriert wenn isExploded = true", () => {
@@ -678,6 +795,52 @@ describe("Game Reducer", () => {
     expect(state.reactivityMargin).toBeLessThan(PHYSICS.OZR_MINIMUM_SAFE);
   });
 
+  test("Live-Xenonstall bleibt nach voller Stabausfahrt schwer erholbar", () => {
+    let state = advanceTicks(createTestState(), 20);
+
+    state = gameReducer(state, { type: "SET_MANUAL_RODS", payload: 0 });
+    state = gameReducer(state, { type: "SET_AUTO_RODS", payload: 0 });
+    state = gameReducer(state, { type: "SET_SHORTENED_RODS", payload: 0 });
+
+    const afterRecoveryAttempt = advanceTicks(state, 40);
+
+    expect(afterRecoveryAttempt.reactivityMargin).toBeLessThan(PHYSICS.OZR_MINIMUM_SAFE);
+    expect(afterRecoveryAttempt.xenonConcentration).toBeGreaterThan(PHYSICS.XENON_WARNING_CONCENTRATION);
+    expect(afterRecoveryAttempt.thermalPower).toBeLessThan(PHYSICS.TEST_POWER_MIN);
+    expect(afterRecoveryAttempt.isExploded).toBe(false);
+  });
+
+  test("AZ-5 nach Live-Xenonstall und voller Stabausfahrt zerstoert den Reaktor", () => {
+    let state = advanceTicks(createTestState(), 20);
+
+    state = gameReducer(state, { type: "SET_MANUAL_RODS", payload: 0 });
+    state = gameReducer(state, { type: "SET_AUTO_RODS", payload: 0 });
+    state = gameReducer(state, { type: "SET_SHORTENED_RODS", payload: 0 });
+    state = advanceTicks(state, 20);
+
+    const az5State = gameReducer(state, { type: "TRIGGER_AZ5" });
+    const firstSecond = advanceTicks(az5State, 2);
+    const midWindow = advanceTicks(az5State, 8);
+    const beforeExplosion = advanceTicks(az5State, (PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS * 2) - 1);
+    const afterScram = advanceTicks(az5State, PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS * 2);
+
+    expect(firstSecond.thermalPower).toBeLessThan(PHYSICS.TEST_POWER_TARGET);
+    expect(midWindow.thermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
+    expect(midWindow.thermalPower).toBeLessThan(PHYSICS.PEAK_EXCURSION_POWER * 0.15);
+    expect(beforeExplosion.isExploded).toBe(false);
+    expect(beforeExplosion.az5TerminalDamage).toBe(true);
+    expect(beforeExplosion.thermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
+    expect(beforeExplosion.steamPressure).toBeGreaterThan(PHYSICS.STEAM_PRESSURE_CRITICAL);
+    expect(afterScram.isExploded).toBe(true);
+    expect(afterScram.thermalPower).toBeGreaterThanOrEqual(PHYSICS.PEAK_EXCURSION_POWER * 0.99);
+    expect(afterScram.thermalPower).toBeLessThanOrEqual(PHYSICS.PEAK_EXCURSION_POWER);
+    expect(
+      afterScram.events.some((event) =>
+        event.code === "meltdown" || event.code === "pressure-explosion"
+      )
+    ).toBe(true);
+  });
+
   test("Unmittelbares AZ-5 nach Stab-Ausfahrt speichert den aktuellen OZR statt des letzten Tick-Werts", () => {
     let state = {
       ...INITIAL_STATE,
@@ -734,12 +897,21 @@ describe("Game Reducer", () => {
       safetyRods: 8,
     });
 
-    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, 10);
+    const warningWindow = advanceTicksWithPeaks({ ...state, ...triggerAZ5(state) }, (PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS * 2) - 1);
+    const beforeExplosion = warningWindow.state;
+    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS * 2);
 
+    expect(beforeExplosion.isExploded).toBe(false);
+    expect(beforeExplosion.az5TerminalDamage).toBe(true);
+    expect(warningWindow.peakFuelTemperature).toBeGreaterThan(PHYSICS.FUEL_TEMP_WARNING);
+    expect(warningWindow.peakCoreTemperature).toBeGreaterThan(PHYSICS.FUEL_TEMP_WARNING);
+    expect(warningWindow.peakThermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
     expect(afterScram.isExploded).toBe(true);
-    expect(afterScram.thermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
-    expect(afterScram.fuelTemperature).toBeGreaterThanOrEqual(PHYSICS.FUEL_TEMP_MELTDOWN);
-    expect(afterScram.events.some((event) => event.code === "meltdown")).toBe(true);
+    expect(
+      afterScram.events.some((event) =>
+        event.code === "meltdown" || event.code === "pressure-explosion"
+      )
+    ).toBe(true);
   });
 
   test("AZ-5 bei 16 MW, Xenon-Pit und OZR < 15 erzeugt auch ohne Start-Void eine Exkursion", () => {
@@ -758,12 +930,61 @@ describe("Game Reducer", () => {
       safetyRods: 8,
     });
 
-    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, 12);
+    const warningWindow = advanceTicksWithPeaks({ ...state, ...triggerAZ5(state) }, (PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS * 2) - 1);
+    const beforeExplosion = warningWindow.state;
+    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS * 2);
 
+    expect(beforeExplosion.isExploded).toBe(false);
+    expect(beforeExplosion.az5TerminalDamage).toBe(true);
+    expect(warningWindow.peakThermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
+    expect(warningWindow.peakFuelTemperature).toBeGreaterThan(PHYSICS.FUEL_TEMP_WARNING);
     expect(afterScram.isExploded).toBe(true);
-    expect(afterScram.thermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
-    expect(afterScram.fuelTemperature).toBeGreaterThanOrEqual(PHYSICS.FUEL_TEMP_MELTDOWN);
-    expect(afterScram.events.some((event) => event.code === "meltdown")).toBe(true);
+    expect(
+      afterScram.events.some((event) =>
+        event.code === "meltdown" || event.code === "pressure-explosion"
+      )
+    ).toBe(true);
+  });
+
+  test("AZ-5 bei 147% Xenon und OZR < 15 fuehrt bei 700 MW zur Exkursion", () => {
+    const testFlux = PHYSICS.TEST_POWER_TARGET / PHYSICS.NOMINAL_POWER;
+    const state = createTestState({
+      thermalPower: PHYSICS.TEST_POWER_TARGET,
+      neutronFlux: testFlux,
+      delayedNeutronPrecursors: createEquilibriumDelayedNeutronPrecursors(testFlux),
+      xenonConcentration: 1.47,
+      coolantTemperature: PHYSICS.COOLANT_TEMP_NOMINAL,
+      steamVoidFraction: 0,
+      fuelTemperature: 700,
+      manualRods: 0,
+      autoRods: 0,
+      shortenedRods: 0,
+      safetyRods: 8,
+    });
+
+    const earlyScram = advanceTicks({ ...state, ...triggerAZ5(state) }, 8);
+    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS * 2);
+
+    expect(earlyScram.thermalPower).toBeGreaterThan(PHYSICS.TEST_POWER_TARGET);
+    expect(earlyScram.isExploded).toBe(false);
+    expect(afterScram.az5TerminalDamage).toBe(true);
+    expect(afterScram.isExploded).toBe(true);
+    expect(
+      afterScram.events.some((event) =>
+        event.code === "meltdown" || event.code === "pressure-explosion"
+      )
+    ).toBe(true);
+  });
+
+  test("AZ-5 bei hohem Xenon aber OZR > 30 bleibt eine sichere Abschaltung", () => {
+    const state = createTestState();
+
+    const afterScram = advanceTicks({ ...state, ...triggerAZ5(state) }, 20);
+
+    expect(state.xenonConcentration).toBeGreaterThan(PHYSICS.XENON_WARNING_CONCENTRATION);
+    expect(state.reactivityMargin).toBeGreaterThan(PHYSICS.OZR_WARNING);
+    expect(afterScram.isExploded).toBe(false);
+    expect(afterScram.thermalPower).toBeLessThan(state.thermalPower);
   });
 
   test("AZ-5 bei OZR > 30 und Xenon nahe Gleichgewicht fährt sicher herunter", () => {

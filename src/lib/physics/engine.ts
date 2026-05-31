@@ -69,7 +69,12 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     reactivityMargin,
   });
 
-  const neutronFlux = clamp(core.neutronFlux, MIN_NEUTRON_FLUX, FLUX_CAP);
+  const historicalAz5FluxTarget = calculateAz5HistoricalFluxTarget(state);
+  const neutronFlux = clamp(
+    core.neutronFlux,
+    MIN_NEUTRON_FLUX,
+    historicalAz5FluxTarget ?? FLUX_CAP
+  );
   const thermalPower = clamp(
     neutronFlux * PHYSICS.NOMINAL_POWER,
     PHYSICS.DECAY_HEAT_FLOOR,
@@ -184,8 +189,22 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
 
   let isExploded = state.isExploded;
   let testCompleted = state.testCompleted;
+  const az5InsertionElapsed = state.az5Active
+    ? PHYSICS.AZ5_FULL_INSERTION_TIME - state.az5Timer + DT
+    : 0;
+  const inDelayedAz5Accident = isDelayedAz5Accident(state);
+  let az5TerminalDamage = state.az5TerminalDamage;
+  const terminalFuelDamage = core.fuelTemperature >= PHYSICS.FUEL_TEMP_MELTDOWN;
+  const terminalPressureDamage = steamPressure >= PHYSICS.STEAM_PRESSURE_CRITICAL;
 
-  if (core.fuelTemperature >= PHYSICS.FUEL_TEMP_MELTDOWN) {
+  if (inDelayedAz5Accident && (terminalFuelDamage || terminalPressureDamage)) {
+    az5TerminalDamage = true;
+  }
+
+  const az5DelayExpired =
+    !inDelayedAz5Accident || az5InsertionElapsed >= PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS;
+
+  if (terminalFuelDamage && az5DelayExpired) {
     isExploded = true;
     addEventIfNew(
       events,
@@ -196,12 +215,23 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     );
   }
 
-  if (steamPressure >= PHYSICS.STEAM_PRESSURE_CRITICAL) {
+  if (terminalPressureDamage && az5DelayExpired) {
     isExploded = true;
     addEventIfNew(
       events,
       elapsed,
       `DRUCKROHRVERSAGEN — Dampfdruck ${steamPressure.toFixed(1)} bar, Dampfexplosion`,
+      "alarm",
+      "pressure-explosion",
+    );
+  }
+
+  if (az5TerminalDamage && inDelayedAz5Accident && az5InsertionElapsed >= PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS) {
+    isExploded = true;
+    addEventIfNew(
+      events,
+      elapsed,
+      `AZ-5-EXKURSION — nach ${az5InsertionElapsed.toFixed(1)} s: ${Math.round(thermalPower)} MW, Void ${(core.steamVoidFraction * 100).toFixed(0)} %, Druck ${steamPressure.toFixed(1)} bar`,
       "alarm",
       "pressure-explosion",
     );
@@ -378,6 +408,7 @@ export function calculateNextState(state: ReactorState): Partial<ReactorState> {
     az5Active,
     az5Triggered: state.az5Triggered,
     az5Timer,
+    az5TerminalDamage,
     controlRods: finalControlRods,
     manualRods,
     autoRods,
@@ -426,6 +457,8 @@ export function triggerAZ5(state: ReactorState): Partial<ReactorState> {
     az5PrePower: state.thermalPower,
     az5PreMargin: currentControlRods,
     az5PreVoid: state.steamVoidFraction,
+    az5PreXenon: state.xenonConcentration,
+    az5TerminalDamage: false,
     events,
   };
 }
@@ -449,19 +482,24 @@ export function triggerBAZ(state: ReactorState): Partial<ReactorState> {
 }
 
 function calculateAz5GraphiteTipReactivity(state: ReactorState, az5Timer: number): number {
-  const insertionElapsed = PHYSICS.AZ5_FULL_INSERTION_TIME - az5Timer;
+  const insertionElapsed = calculateAz5InsertionElapsed(az5Timer);
   if (insertionElapsed >= PHYSICS.AZ5_GRAPHIT_SPIKE_DURATION) {
     return 0;
   }
 
-  const spikePhase = 1 - insertionElapsed / PHYSICS.AZ5_GRAPHIT_SPIKE_DURATION;
+  const spikeProgress = clamp01(insertionElapsed / PHYSICS.AZ5_GRAPHIT_SPIKE_DURATION);
+  const spikePhase = Math.pow(spikeProgress, PHYSICS.AZ5_GRAPHITE_REACTIVITY_RAMP_EXPONENT);
   const refPower = state.az5PrePower;
   const refMargin = state.az5PreMargin;
   const refVoid = Math.max(state.steamVoidFraction, state.az5PreVoid);
+  const xenonPitSeverity = calculateXenonPitSeverity(state.xenonConcentration);
+  const effectivePowerThreshold =
+    PHYSICS.AZ5_GRAPHIT_POWER_THRESHOLD *
+    (1 + xenonPitSeverity * PHYSICS.AZ5_XENON_POWER_THRESHOLD_GAIN);
 
   const lowPowerSeverity = clamp01(
-    (PHYSICS.AZ5_GRAPHIT_POWER_THRESHOLD - refPower) /
-    PHYSICS.AZ5_GRAPHIT_POWER_THRESHOLD
+    (effectivePowerThreshold - refPower) /
+    effectivePowerThreshold
   );
   const lowMarginSeverity = clamp01(
     (PHYSICS.AZ5_GRAPHIT_MARGIN_THRESHOLD - refMargin) /
@@ -486,6 +524,36 @@ function calculateAz5GraphiteTipReactivity(state: ReactorState, az5Timer: number
   return peakReactivity * spikeSeverity * spikePhase;
 }
 
+function calculateAz5InsertionElapsed(az5Timer: number): number {
+  return clamp(
+    PHYSICS.AZ5_FULL_INSERTION_TIME - az5Timer + DT,
+    0,
+    PHYSICS.AZ5_FULL_INSERTION_TIME
+  );
+}
+
+function calculateAz5HistoricalFluxTarget(state: ReactorState): number | null {
+  if (!isDelayedAz5Accident(state)) {
+    return null;
+  }
+
+  const insertionElapsed = Math.min(
+    calculateAz5InsertionElapsed(state.az5Timer),
+    PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS
+  );
+  const progress = clamp01(insertionElapsed / PHYSICS.AZ5_EXPLOSION_DELAY_SECONDS);
+  const historicalRamp = Math.pow(progress, PHYSICS.AZ5_EXCURSION_POWER_RAMP_EXPONENT);
+  const startPower = clamp(
+    state.az5PrePower || state.thermalPower,
+    PHYSICS.DECAY_HEAT_FLOOR,
+    PHYSICS.PEAK_EXCURSION_POWER
+  );
+  const powerCeiling = startPower +
+    (PHYSICS.PEAK_EXCURSION_POWER - startPower) * historicalRamp;
+
+  return clamp(powerCeiling / PHYSICS.NOMINAL_POWER, MIN_NEUTRON_FLUX, FLUX_CAP);
+}
+
 function calculateAz5DirectVoidTarget(state: ReactorState, graphiteTipReactivity: number): number {
   if (!state.az5Active || state.az5Timer <= 0 || graphiteTipReactivity <= 0) {
     return 0;
@@ -494,10 +562,7 @@ function calculateAz5DirectVoidTarget(state: ReactorState, graphiteTipReactivity
   const normalizedSpike = clamp01(
     graphiteTipReactivity / PHYSICS.AZ5_GRAPHITE_LOW_ORM_REACTIVITY
   );
-  const xenonSeverity = clamp01(
-    (state.xenonConcentration - PHYSICS.XENON_WARNING_CONCENTRATION) /
-    (PHYSICS.XENON_SEVERE_CONCENTRATION - PHYSICS.XENON_WARNING_CONCENTRATION)
-  );
+  const xenonSeverity = calculateXenonPitSeverity(state.xenonConcentration);
 
   return clamp01(normalizedSpike * PHYSICS.AZ5_DIRECT_VOID_GAIN * (0.7 + xenonSeverity * 0.3));
 }
@@ -795,7 +860,15 @@ function integrateCoreDynamics(state: ReactorState, control: CoreControlState): 
       nextPrecursors[index] = Math.max(0, core.delayedNeutronPrecursors[index] + precursorDot * subDt);
     });
 
-    core.neutronFlux = clamp(core.neutronFlux + neutronDot * subDt, 0, FLUX_CAP);
+    const historicalAz5FluxTarget = calculateAz5HistoricalFluxTarget(state);
+    core.neutronFlux = clamp(
+      core.neutronFlux + neutronDot * subDt,
+      0,
+      historicalAz5FluxTarget ?? FLUX_CAP
+    );
+    if (historicalAz5FluxTarget !== null) {
+      core.neutronFlux = Math.max(core.neutronFlux, historicalAz5FluxTarget);
+    }
     core.delayedNeutronPrecursors = nextPrecursors;
     core.iodineConcentration = Math.max(0, core.iodineConcentration + iodineDot * subDt);
     core.xenonConcentration = clamp(core.xenonConcentration + xenonDot * subDt, 0, PHYSICS.XENON_PIT_CAP);
@@ -886,12 +959,26 @@ function calculateXenonLowPowerDrag(
   const belowTargetSeverity = clamp01(
     (PHYSICS.TEST_POWER_TARGET - powerMW) / PHYSICS.TEST_POWER_TARGET
   );
-  const poisonSeverity = clamp01(
-    (core.xenonConcentration - PHYSICS.XENON_WARNING_CONCENTRATION) /
-    (PHYSICS.XENON_SEVERE_CONCENTRATION - PHYSICS.XENON_WARNING_CONCENTRATION)
-  );
+  const poisonSeverity = calculateXenonPitSeverity(core.xenonConcentration);
+  const nonlinearLowPowerSeverity = belowTargetSeverity * belowTargetSeverity;
 
-  return -PHYSICS.XENON_LOW_POWER_REACTIVITY_DRAG * belowTargetSeverity * poisonSeverity;
+  return -PHYSICS.XENON_LOW_POWER_REACTIVITY_DRAG * nonlinearLowPowerSeverity * poisonSeverity;
+}
+
+function isDelayedAz5Accident(state: ReactorState): boolean {
+  return (
+    state.az5Active &&
+    state.az5Triggered &&
+    state.az5PreMargin < PHYSICS.OZR_MINIMUM_SAFE &&
+    calculateXenonPitSeverity(state.az5PreXenon || state.xenonConcentration) > 0
+  );
+}
+
+function calculateXenonPitSeverity(xenonConcentration: number): number {
+  return clamp01(
+    (xenonConcentration - PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION) /
+    (PHYSICS.XENON_WARNING_CONCENTRATION - PHYSICS.XENON_EQUILIBRIUM_CONCENTRATION)
+  );
 }
 
 function calculateCoolantTarget(powerMW: number, effectiveCooling: number): number {
@@ -906,7 +993,10 @@ function calculateThermalTargets(
   effectiveCooling: number,
   coolantTemperature: number
 ): Pick<CoreDynamicsState, "fuelTemperature" | "fuelSurfaceTemperature" | "claddingTemperature"> {
-  const normalizedPower = powerMW / PHYSICS.NOMINAL_POWER;
+  const normalizedPower = Math.max(
+    powerMW / PHYSICS.NOMINAL_POWER,
+    PHYSICS.DECAY_HEAT_FLOOR / PHYSICS.TEST_POWER_TARGET
+  );
   const claddingTemperature =
     coolantTemperature + (normalizedPower * PHYSICS.CLADDING_RISE) / effectiveCooling;
   const fuelSurfaceTemperature =
@@ -967,14 +1057,22 @@ function calculateVoidTarget(
   // gemittelter Kühlmitteltemperatur und realer Zwei-Phasen-Strömung im RBMK-Kanal
   // und stellt sicher, dass ein Pumpenausfall die positive Void-Rückkopplung anregt.
   const coolingDeficit = clamp01(1 - effectiveCooling);
+  const channelBoilingPower = Math.max(
+    powerMW / PHYSICS.NOMINAL_POWER,
+    PHYSICS.DECAY_HEAT_FLOOR / PHYSICS.TEST_POWER_TARGET
+  );
   const flowInducedVoid = clamp01(
-    (powerMW / PHYSICS.NOMINAL_POWER) * coolingDeficit * PHYSICS.FLOW_INDUCED_VOID_GAIN
+    channelBoilingPower * coolingDeficit * PHYSICS.FLOW_INDUCED_VOID_GAIN
+  );
+  const lossOfFlowVoid = clamp01(
+    Math.pow(coolingDeficit, PHYSICS.LOSS_OF_FLOW_VOID_EXPONENT) *
+      PHYSICS.LOSS_OF_FLOW_VOID_GAIN
   );
 
   // Void inertia is handled by VOID_TIME_CONSTANT in the integration step;
   // do not introduce an additional implicit floor here.
   void priorVoid;
-  return Math.max(equilibriumVoid, promptBoiling * 0.85, flowInducedVoid);
+  return Math.max(equilibriumVoid, promptBoiling * 0.85, flowInducedVoid, lossOfFlowVoid);
 }
 
 function calculateSteamPressure(

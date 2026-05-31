@@ -41,7 +41,7 @@ describe('StatusDisplayPanel', () => {
 
     expect(screen.getByText('ZIEL: 700 MW (TOLERANZ +/-50 MW)')).toBeInTheDocument();
     expect(screen.getByText('700 MW')).toHaveStyle({ color: 'var(--safe-green)' });
-    expect(screen.getByText('100%')).toHaveStyle({ color: 'var(--amber)' });
+    expect(screen.getByText('100 %')).toHaveStyle({ color: 'var(--amber)' });
     expect(screen.getByText('ZIEL 700 MW — LEISTUNG STABIL — ZUSTAND HALTEN')).toHaveStyle({
       color: 'var(--safe-green)',
     });
@@ -68,7 +68,7 @@ describe('StatusDisplayPanel', () => {
   it('uses shared xenon thresholds for pit warning colors', () => {
     renderPanel({ xenonConcentration: PHYSICS.XENON_WARNING_CONCENTRATION + 0.01 });
 
-    expect(screen.getByText('136%')).toHaveStyle({ color: 'var(--warning-yellow)' });
+    expect(screen.getByText('136 %')).toHaveStyle({ color: 'var(--warning-yellow)' });
     expect(screen.getByText('ZIEL 700 MW — XENON HOCH, STABPOSITION BEOBACHTEN')).toHaveStyle({
       color: 'var(--warning-yellow)',
     });

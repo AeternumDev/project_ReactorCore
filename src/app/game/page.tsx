@@ -180,8 +180,8 @@ export default function GamePage() {
               </li>
               <li>
                 AZ-5 fährt Stäbe in <strong style={{ color: 'var(--safe-green)' }}>18 s</strong> ein
-                (≈ 0,4 m/s, historisch korrekt). Der Graphit-Spitzen-Effekt entfaltet sich in den
-                ersten ~5 s.
+                (≈ 0,4 m/s, historisch korrekt). Der positive AZ-5-Transient baut sich über das
+                Unfallfenster bis zur historischen Spitzenleistung auf.
               </li>
               <li>
                 Punktkinetik mit 6 verzögerten Neutronengruppen, 240 Substeps pro Tick — schneller

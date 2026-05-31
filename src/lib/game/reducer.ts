@@ -73,6 +73,11 @@ export const INITIAL_STATE: ReactorState = {
   elapsedSeconds: 0,
   score: PHYSICS.BASE_SCORE,
   events: [],
+  scoreStablePowerSeconds: 0,
+  scoreAwardedStablePowerBonus: false,
+  scoreAwardedTestCompletionBonus: false,
+  scoreAwardedEccsDisabledBonus: false,
+  scorePenalizedEventCount: 0,
 
   targetPower: PHYSICS.TEST_POWER_TARGET,
   xenonBuildupRate: 0,
@@ -84,6 +89,8 @@ export const INITIAL_STATE: ReactorState = {
   az5PrePower: 0,
   az5PreMargin: 0,
   az5PreVoid: 0,
+  az5PreXenon: 0,
+  az5TerminalDamage: false,
   pumpStates: [true, true, true, true, true, true, true, true],
   pumpSpeeds: [1, 1, 1, 1, 1, 1, 1, 1],
   rundownBusActive: true,
@@ -99,8 +106,10 @@ export function gameReducer(state: ReactorState, action: GameAction): ReactorSta
         ...next,
         elapsedSeconds: state.elapsedSeconds + 0.5,
       };
-      newState.score = calculateScore(newState);
-      return newState;
+      return {
+        ...newState,
+        ...calculateScore(state, newState),
+      };
     }
 
     case 'SET_CONTROL_RODS':

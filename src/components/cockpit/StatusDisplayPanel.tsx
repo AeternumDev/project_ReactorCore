@@ -25,6 +25,10 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+export function formatXenonPercent(xenonConcentration: number): string {
+  return `${(xenonConcentration * 100).toFixed(0)} %`;
+}
+
 function getColorForPower(power: number): string {
   if (power > PHYSICS.TEST_POWER_MAX) return 'var(--warning-yellow)';
   if (power >= PHYSICS.TEST_POWER_MIN) return 'var(--safe-green)';
@@ -197,7 +201,7 @@ export default function StatusDisplayPanel({
         />
         <Display
           label="XENON (% v. GLEICHGEW.)"
-          value={`${(xenonConcentration * 100).toFixed(0)}%`}
+          value={formatXenonPercent(xenonConcentration)}
           color={getColorForXenon(xenonConcentration)}
         />
         <Display

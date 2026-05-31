@@ -56,6 +56,13 @@ export interface ReactorState {
   score: number;
   events: GameEvent[];
 
+  // Score bookkeeping
+  scoreStablePowerSeconds: number;
+  scoreAwardedStablePowerBonus: boolean;
+  scoreAwardedTestCompletionBonus: boolean;
+  scoreAwardedEccsDisabledBonus: boolean;
+  scorePenalizedEventCount: number;
+
   // Interne Simulation
   targetPower: number;
   xenonBuildupRate: number;
@@ -68,6 +75,8 @@ export interface ReactorState {
   az5PrePower: number;
   az5PreMargin: number;       // OZR-Stababsenkung zum Zeitpunkt der AZ-5-Auslösung
   az5PreVoid: number;         // Dampfblasenanteil zum Zeitpunkt der AZ-5-Auslösung
+  az5PreXenon: number;         // Xenon-Pit zum Zeitpunkt der AZ-5-Auslösung
+  az5TerminalDamage: boolean;  // latched severe AZ-5 transient damage before final failure
   pumpStates: [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean];
   /**
    * Tatsächliche Drehzahl jeder ГЦН als Anteil (0..1) der Nenndrehzahl.

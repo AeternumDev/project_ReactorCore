@@ -7,6 +7,7 @@ import {
 } from './coreLayout';
 import { PHYSICS } from '@/lib/physics/constants';
 import { GameAction } from '@/lib/physics/types';
+import { formatXenonPercent } from './StatusDisplayPanel';
 
 interface MnemonicBoardProps {
   thermalPower: number;
@@ -57,12 +58,10 @@ function getBlendedCoreTemperature(
   return lerp(north, south, yMix);
 }
 
-function getChannelHeatColor(
+export function getMnemonicChannelHeatColor(
   channel: ChannelInfo,
   coreTemperatureZones: [number, number, number, number],
-  isExploded: boolean,
 ): string {
-  if (isExploded) return '#331100';
   const baseTemp = getBlendedCoreTemperature(channel, coreTemperatureZones);
 
   // Radial gradient: core center hotter, periphery cooler (cosine neutron flux profile)
@@ -82,10 +81,10 @@ function getChannelHeatColor(
 
   const adjustedTemp = baseTemp * radialFactor * rodFactor * variation;
 
-  // Normalize against FUEL_TEMP_WARNING (1200°C) so operating temps (~270–650°C)
-  // spread across the full color gradient. Temps above 1200°C clamp to red.
+  // Normalize against meltdown temperature so the board can show the whole
+  // AZ-5 heat climb instead of saturating to red as soon as warnings begin.
   const norm = Math.max(0, Math.min(1,
-    (adjustedTemp - PHYSICS.COOLANT_TEMP_NOMINAL) / (PHYSICS.FUEL_TEMP_WARNING - PHYSICS.COOLANT_TEMP_NOMINAL)
+    (adjustedTemp - PHYSICS.COOLANT_TEMP_NOMINAL) / (PHYSICS.FUEL_TEMP_MELTDOWN - PHYSICS.COOLANT_TEMP_NOMINAL)
   ));
   return getHeatColor(norm);
 }
@@ -299,7 +298,7 @@ export default function MnemonicBoard({
             let opacity = 0.8;
             switch (viewMode) {
               case 'heat':
-                fill = getChannelHeatColor(ch, coreTemperatureZones, isExploded);
+                fill = getMnemonicChannelHeatColor(ch, coreTemperatureZones);
                 break;
               case 'neutron':
                 fill = getChannelNeutronColor(ch, neutronFlux, isExploded);
@@ -356,7 +355,7 @@ export default function MnemonicBoard({
         <span style={{
           color: getMnemonicXenonColor(xenonConcentration),
         }}>
-          Xe:{(xenonConcentration * 100).toFixed(0)}%
+          Xe:{formatXenonPercent(xenonConcentration)}
         </span>
         <span style={{
           color: reactivityMargin < PHYSICS.OZR_MINIMUM_SAFE ? 'var(--alarm-red)' :
@@ -412,7 +411,7 @@ export default function MnemonicBoard({
               background: 'linear-gradient(to right, #0a3a20, #0a5a2e, #1a7a3e, #4a7a1a, #7a8a00, #aa8800, #cc7700, #cc4400, #dd2200, #ff1111)',
               borderRadius: 1,
             }} />
-            <span style={{ flexShrink: 0 }}>{PHYSICS.FUEL_TEMP_WARNING}°C+</span>
+            <span style={{ flexShrink: 0 }}>{PHYSICS.FUEL_TEMP_MELTDOWN}°C</span>
           </div>
         )}
         {viewMode === 'neutron' && (

@@ -1,45 +1,76 @@
 import { ReactorState } from "@/lib/physics/types";
 import { PHYSICS } from "@/lib/physics/constants";
 
-export function calculateScore(state: ReactorState): number {
-  let score = PHYSICS.BASE_SCORE;
+type ScoreUpdate = Pick<
+  ReactorState,
+  | "score"
+  | "scoreStablePowerSeconds"
+  | "scoreAwardedStablePowerBonus"
+  | "scoreAwardedTestCompletionBonus"
+  | "scoreAwardedEccsDisabledBonus"
+  | "scorePenalizedEventCount"
+>;
 
-  // Abzug für jede Sekunde außerhalb des historischen Haltekorridors.
-  if (state.thermalPower < PHYSICS.TEST_POWER_MIN || state.thermalPower > PHYSICS.TEST_POWER_MAX) {
-    score -= PHYSICS.SCORE_PENALTY_PER_SECOND_OFF_TARGET;
+const STABLE_LOW_POWER_XENON_LIMIT = 1.2;
+
+export function calculateScore(previousState: ReactorState, state: ReactorState): ScoreUpdate {
+  const elapsedDelta = Math.max(0, state.elapsedSeconds - previousState.elapsedSeconds);
+  let score = Number.isFinite(previousState.score) ? previousState.score : PHYSICS.BASE_SCORE;
+
+  if (isOutsideTestPowerBand(state)) {
+    score -= PHYSICS.SCORE_PENALTY_PER_SECOND_OFF_TARGET * elapsedDelta;
   }
 
-  // Abzug für Alarm-Events
-  const alarmCount = state.events.filter(e => e.severity === 'alarm').length;
-  score -= alarmCount * PHYSICS.SCORE_PENALTY_PER_ALARM;
+  const firstUnpenalizedEvent = Math.max(0, previousState.scorePenalizedEventCount ?? 0);
+  const newEvents = state.events.slice(firstUnpenalizedEvent);
+  for (const event of newEvents) {
+    if (event.severity === "alarm") {
+      score -= PHYSICS.SCORE_PENALTY_PER_ALARM;
+    } else if (event.severity === "critical") {
+      score -= PHYSICS.SCORE_PENALTY_PER_CRITICAL;
+    }
+  }
 
-  // Bonus bei Test-Erfolg
-  if (state.testCompleted) {
+  const stablePowerSeconds = isStableLowPowerState(state)
+    ? previousState.scoreStablePowerSeconds + elapsedDelta
+    : 0;
+  let scoreAwardedStablePowerBonus = previousState.scoreAwardedStablePowerBonus;
+  if (!scoreAwardedStablePowerBonus && stablePowerSeconds >= 60) {
+    score += PHYSICS.SCORE_BONUS_STABLE_LOW_POWER;
+    scoreAwardedStablePowerBonus = true;
+  }
+
+  let scoreAwardedTestCompletionBonus = previousState.scoreAwardedTestCompletionBonus;
+  if (state.testCompleted && !scoreAwardedTestCompletionBonus) {
     score += PHYSICS.SCORE_BONUS_TEST_SUCCESS;
+    scoreAwardedTestCompletionBonus = true;
   }
 
-  // Bonus bei deaktiviertem ECCS und Test-Erfolg
-  if (!state.eccsEnabled && state.testCompleted) {
+  let scoreAwardedEccsDisabledBonus = previousState.scoreAwardedEccsDisabledBonus;
+  if (state.testCompleted && !state.eccsEnabled && !scoreAwardedEccsDisabledBonus) {
     score += PHYSICS.SCORE_BONUS_ECCS_DISABLED;
+    scoreAwardedEccsDisabledBonus = true;
   }
 
-  // Bonus für stabile Leistung: ≥60s nahe Zielwert bei kontrolliertem Xenon.
-  if (
+  return {
+    score: Math.max(0, Math.round(score)),
+    scoreStablePowerSeconds: stablePowerSeconds,
+    scoreAwardedStablePowerBonus,
+    scoreAwardedTestCompletionBonus,
+    scoreAwardedEccsDisabledBonus,
+    scorePenalizedEventCount: state.events.length,
+  };
+}
+
+function isOutsideTestPowerBand(state: ReactorState): boolean {
+  return state.thermalPower < PHYSICS.TEST_POWER_MIN || state.thermalPower > PHYSICS.TEST_POWER_MAX;
+}
+
+function isStableLowPowerState(state: ReactorState): boolean {
+  return (
+    !state.isExploded &&
     state.thermalPower >= PHYSICS.TEST_POWER_MIN &&
     state.thermalPower <= PHYSICS.TEST_POWER_MAX &&
-    state.xenonConcentration < 1.2 &&
-    state.elapsedSeconds >= 60
-  ) {
-    score += PHYSICS.SCORE_BONUS_STABLE_LOW_POWER;
-  }
-
-  // Tiefes Xenon-Pit-Niveau bleibt als Unfallfalle markiert, gibt aber keinen Bonus.
-  if (
-    state.thermalPower >= PHYSICS.DANGER_POWER_LEVEL - 50 &&
-    state.thermalPower <= PHYSICS.DANGER_POWER_LEVEL + 100
-  ) {
-    score += PHYSICS.SCORE_BONUS_DANGER_ZONE;
-  }
-
-  return Math.max(0, score);
+    state.xenonConcentration < STABLE_LOW_POWER_XENON_LIMIT
+  );
 }
