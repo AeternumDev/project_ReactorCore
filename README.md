@@ -1,4 +1,4 @@
-# ReactorCore — Tschernobyl-Reaktor-Simulation
+# ReactorCore: Tschernobyl Reaktor Simulation
 
 Eine browserbasierte Tschernobyl-Reaktor-Simulation als Single Page Application. Steuere einen RBMK-1000-Reaktor und erlebe die Physik hinter dem Unfall von 1986.
 
