@@ -2,19 +2,6 @@
 
 Eine browserbasierte Tschernobyl-Reaktor-Simulation als Single Page Application. Steuere einen RBMK-1000-Reaktor und erlebe die Physik hinter dem Unfall von 1986.
 
-## Tech-Stack
-
-| Technologie | Verwendung |
-|---|---|
-| Next.js 14 | Framework (App Router) |
-| React | UI-Bibliothek |
-| TypeScript | Typsicherheit |
-| Tailwind CSS | Styling |
-| Clerk | Authentifizierung |
-| PostgreSQL | Datenbank (Railway) |
-| Recharts | Diagramme & Visualisierung |
-| Lucide React | Icons |
-| Jest + Testing Library | Unit-Tests |
 
 ## Setup
 
@@ -48,16 +35,5 @@ Die App ist dann unter [http://localhost:3000](http://localhost:3000) erreichbar
 | `npm run test:watch` | Tests im Watch-Modus |
 | `npm run test:coverage` | Tests mit Coverage-Report |
 
-## Projektstruktur
 
-```
-src/
-├── app/           # Next.js App Router (Pages, Layouts, API Routes)
-├── components/    # React-Komponenten (Cockpit, UI)
-├── lib/
-│   ├── physics/   # Reaktor-Physik-Engine
-│   ├── game/      # Game-State (Reducer, Actions, Scoring)
-│   └── db.ts      # Datenbank-Verbindung
-└── __tests__/     # Unit-Tests
-```
 
